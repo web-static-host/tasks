@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления задачами</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark mb-4 shadow">
+        <div class="container d-flex justify-content-between">
+            <span class="navbar-brand">Технический портал</span>
+            <span id="user-info" class="badge bg-secondary"></span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Мои задачи</h2>
+            <button type="button" class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#taskModal">
+                + Новая задача
+            </button>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Специалист</th>
+                            <th>Задача</th>
+                            <th>Дата и время</th>
+                            <th>Стоимость</th>
+                            <th>Статус</th>
+                            <th>Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="task-list">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title">Постановка новой задачи</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="task-form">
+                        <div class="step mb-3">
+                            <label class="form-label fw-bold">1. Тип работы</label>
+                            <select id="category" class="form-select mb-2" required>
+                                <option value="">Выберите категорию...</option>
+                                <option value="Техподдержка">Техподдержка</option>
+                                <option value="Внедрение">Внедрение</option>
+                            </select>
+                            <select id="taskName" class="form-select" required>
+                                <option value="">Выберите задачу...</option>
+                                <option value="Настройка сервера">Настройка сервера</option>
+                                <option value="Обновление ПО">Обновление ПО</option>
+                                <option value="Консультация">Консультация</option>
+                            </select>
+                        </div>
+
+                        <div class="step mb-3">
+                            <label class="form-label fw-bold">2. Исполнитель</label>
+                            <select id="specialist" class="form-select" required>
+                                <option value="">Выберите специалиста...</option>
+                                <option value="Иванов И.И.">Иванов И.И.</option>
+                                <option value="Петров П.П.">Петров П.П.</option>
+                            </select>
+                        </div>
+
+                        <div class="step mb-3">
+                            <label class="form-label fw-bold">3. Планирование</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="date" id="date" class="form-control" required>
+                                </div>
+                                <div class="col-6">
+                                    <select id="time" class="form-select" required disabled>
+                                        <option value="">Время...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <small class="text-muted">Доступны только свободные слоты специалиста</small>
+                        </div>
+
+                        <div class="step mb-3">
+                            <label class="form-label fw-bold">4. Информация по клиенту</label>
+                            <input type="text" id="inn" class="form-control mb-2" placeholder="ИНН клиента" required>
+                            <input type="url" id="bitrix" class="form-control mb-2" placeholder="Ссылка на Битрикс24" required>
+                            <div class="input-group">
+                                <span class="input-group-text">₽</span>
+                                <input type="number" id="price" class="form-control" placeholder="Стоимость" required>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 py-2 shadow-sm" id="submit-btn">Забронировать время</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
