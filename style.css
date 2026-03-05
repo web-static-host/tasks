@@ -1,3 +1,4 @@
+/* ОБЩИЕ СТИЛИ СТРАНИЦЫ */
 body {
     background-color: #f8f9fa;
 }
@@ -18,12 +19,16 @@ body {
     font-size: 0.9rem;
 }
 
+.table-responsive { 
+    overflow: visible !important; 
+}
+
 #submit-btn:disabled {
     cursor: not-allowed;
     opacity: 0.7;
 }
 
-/* Эффект загрузки */
+/* ЭФФЕКТ ЗАГРУЗКИ */
 .loading {
     position: relative;
     pointer-events: none;
@@ -32,4 +37,216 @@ body {
     content: "⏳";
     position: absolute;
     right: 10px;
+}
+
+/* РАЗДЕЛИТЕЛЬ ДНЕЙ В ТАБЛИЦЕ */
+.day-divider {
+    background-color: #f8f9fa !important;
+    border-top: 3px solid #b4b6b9 !important;
+}
+.day-divider td {
+    padding: 8px 15px !important;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #0d6efd;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.table-hover tbody tr.day-divider:hover td {
+    background-color: #f8f9fa !important;
+    color: #0d6efd !important; /* Твой синий цвет из стилей */
+}
+
+/* Делаем строку "невидимой" для курсора */
+.day-divider {
+    pointer-events: none;
+    cursor: default;
+}
+
+/* ОБЪЕДИНЕННАЯ ПАНЕЛЬ ФИЛЬТРОВ И ВКЛАДОК */
+.filter-panel {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #f1f3f5;
+    margin-bottom: 20px;
+    overflow: hidden; /* Важно для вкладок */
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* СТИЛИ ВКЛАДОК (TABS) */
+.nav-tabs {
+    background-color: #f8f9fa;
+    padding: 0 15px;
+    gap: 5px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.nav-tabs .nav-link:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: transparent;
+}
+
+.nav-tabs .nav-link.active {
+    background: none !important;
+    color: #0d6efd !important;
+    border-bottom: 3px solid #0d6efd !important;
+    font-weight: bold;
+}
+
+/* БЛОК СПЕЦИАЛИСТОВ ВНУТРИ ПАНЕЛИ */
+#tech-filters-container {
+    background: transparent !important;
+    padding: 0 !important;
+    margin-bottom: 1.5rem !important;
+}
+
+#tech-filters .btn {
+    border-radius: 20px;
+    padding: 4px 15px;
+    font-size: 0.85rem;
+    margin: 2px;
+}
+
+#tech-filters .btn.active { 
+    background-color: #6c757d; 
+    color: white; 
+    border-color: #6c757d; 
+}
+
+/* ПОИСК */
+.search-container {
+    max-width: 350px;
+    position: relative;
+}
+
+.input-group-custom {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #adb5bd;
+    pointer-events: none;
+    transition: color 0.3s ease;
+}
+
+.form-search {
+    width: 250px; /* Базовая ширина */
+    padding: 8px 12px 8px 35px;
+    font-size: 0.95rem;
+    border: 1px solid #dee2e6;
+    border-radius: 50px; 
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.form-search:focus {
+    outline: none;
+    background-color: #fff;
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+    width: 300px; /* Слегка расширяется при фокусе */
+}
+
+/* КНОПКИ ДЕЙСТВИЙ В ТАБЛИЦЕ */
+.btn-action {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+    color: #6c757d;
+}
+
+.btn-edit:hover, .btn-reschedule:hover {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+    transform: translateY(-1px);
+}
+
+.btn-delete:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    transform: translateY(-1px);
+}
+
+.btn-action svg {
+    width: 18px;
+    height: 18px;
+}
+
+.status-dropdown { 
+    cursor: pointer; 
+    border: none; 
+}
+.status-dropdown::after { 
+     display: none; 
+}
+
+/* КНОПКА НОВОЙ ЗАДАЧИ */
+#add-task-btn {
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 20px;
+}
+
+/* АДАПТИВНОСТЬ */
+@media (max-width: 768px) {
+    .filter-panel .d-flex {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+    
+    .form-search {
+        width: 100% !important;
+    }
+    
+    .justify-content-end {
+        justify-content: flex-start !important;
+    }
+
+    .search-container {
+        max-width: 100%;
+    }
+}
+
+td:nth-child(8) { 
+    white-space: nowrap !important;
+    min-width: 140px; /* Даем колонке с временем достаточно места в одну строку */
+}
+
+/* 1. Находим ячейку статуса (11-я колонка) */
+table td:nth-child(11) {
+    width: 110px !important;       /* Ограничиваем ширину ячейки */
+    white-space: normal !important; /* Разрешаем перенос в ячейке */
+    
+}
+
+/* 2. Сбрасываем запрет переноса у самого бейджа (Bootstrap-класса) */
+table td:nth-child(11) .badge {
+    white-space: normal !important; /* ГЛАВНОЕ: разрешаем перенос внутри плашки */
+    display: inline-block;          /* Позволяем блоку менять высоту */
+    width: 100%;                   /* Растягиваем на всю ширину ячейки */
+    text-align: center;             /* Выравниваем текст по левому краю */
+
 }
