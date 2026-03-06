@@ -162,6 +162,7 @@
                         <div id="dateTimeBlock" class="step mb-3">
                             <label class="form-label fw-bold">3. Планирование</label>
                             <div class="row g-2">
+                                
                                 <div class="col-6">
                                     <input type="text" id="date" class="form-control" placeholder="Выберите дату">
                                 </div>
@@ -170,6 +171,11 @@
                                         <option value="">Время...</option>
                                     </select>
                                 </div>
+                                <div id="durationBlock" class="col-md-6 mb-3">
+    <label class="form-label">Длительность (ЧЧ:ММ)</label>
+    <input type="time" id="taskDuration" class="form-control" value="00:30" min="00:30" step="1800">
+    <div class="form-text">Поменяйте, если нужно больше времени</div>
+</div>
                             </div>
                             <div class="mb-3" id="commentBlock">
                              <label class="form-label">Примечание</label>

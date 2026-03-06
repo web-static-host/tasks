@@ -63,13 +63,16 @@ items.forEach(item => {
     const time = item.time.substring(0, 5);
     busyTimes.push(time);
     
-    // Если задача длинная, помечаем следующий слот как занятый
-    const d = item.duration || 30;
-    if (d > 30) {
+    // Занимаем столько слотов по 30 мин, сколько указано в duration
+    let d = Number(item.duration) || 30;
+    let offset = 30;
+    while (d > 30) {
         const [h, m] = time.split(':').map(Number);
         const next = new Date();
-        next.setHours(h, m + 30, 0, 0);
+        next.setHours(h, m + offset, 0, 0);
         busyTimes.push(`${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}`);
+        d -= 30;
+        offset += 30;
     }
 });
 
@@ -92,8 +95,9 @@ items.forEach(item => {
             }
 
             // Добавляем слот, если он не занят И не в прошлом
-            const currentNeeded = (document.getElementById('category').value === 'Техподдержка' && 
-                       document.getElementById('taskName').value === 'Сервер') ? 60 : 30;
+            const durationRaw = document.getElementById('taskDuration')?.value || "00:30";
+const [neededH, neededM] = durationRaw.split(':').map(Number);
+const currentNeeded = (neededH * 60) + neededM;
 
 if (!busyTimes.includes(slot) && !isPast) {
     if (currentNeeded > 30) {
@@ -126,14 +130,19 @@ document.getElementById('specialist')?.addEventListener('change', () => updateFr
 
 // 3. УПРАВЛЕНИЕ СТАТУСОМ (Сделал глобальными)
 window.updateTaskStatus = async (id, newStatus) => {
-    const targetTable = (typeof currentTable !== 'undefined') ? currentTable : 'tasks';
-    try {
-        const { error } = await supabase.from(targetTable).update({ status: newStatus }).eq('id', id);
-        if (error) throw error;
-        await loadTasks(); 
-    } catch (e) {
-        console.error("Ошибка обновления статуса:", e);
-    }
+    try {
+        // Создаем объект для обновления
+        const updateData = { status: newStatus };
+        
+        // Если статус "Выполнено", сбрасываем длительность в 0, чтобы освободить слоты
+        if (newStatus === 'Выполнено') {
+            updateData.duration = 0;
+        }
+
+        const { error } = await supabase.from(currentTable).update(updateData).eq('id', id);
+        if (error) throw error;
+        loadTasks();
+    } catch (e) { console.error(e); }
 };
 
 window.handleBitrixClick = async (id, currentStatus) => {
@@ -271,6 +280,14 @@ document.getElementById('task-form')?.addEventListener('submit', async (e) => {
     const categoryValue = document.getElementById('category').value;
     const taskNameValue = document.getElementById('taskName').value;
 
+    // Получаем значение из нового поля ЧЧ:ММ
+    const durationInput = document.getElementById('taskDuration')?.value || "00:30";
+    const [h, m] = durationInput.split(':').map(Number);
+    let totalMinutes = (h * 60) + m;
+    
+    // Защита от 0
+    if (totalMinutes < 30) totalMinutes = 30;
+
     const taskData = {
         dept: currentUser.dept,
         specialist: document.getElementById('specialist').value,
@@ -278,8 +295,7 @@ document.getElementById('task-form')?.addEventListener('submit', async (e) => {
         task_name: taskNameValue,
         inn: document.getElementById('inn').value,
         bitrix_url: document.getElementById('bitrix').value,
-        // Если Сервер в Техподдержке — пишем 60 минут, всё остальное — 30
-        duration: (categoryValue === 'Техподдержка' && taskNameValue === 'Сервер') ? 60 : 30
+        duration: totalMinutes // Теперь пишем реальные минуты из инпута
     };
 
     // 2. Добавляем имя менеджера ТОЛЬКО если это создание новой задачи
@@ -343,6 +359,22 @@ window.openEditTask = async (id) => {
             document.getElementById('inn').value = task.inn;
             document.getElementById('bitrix').value = task.bitrix_url;
             document.getElementById('taskComment').value = task.comment || ''; 
+const dbDuration = task.duration || 30; 
+
+// Математика: 90 / 60 = 1 час (целое число)
+const hours = Math.floor(dbDuration / 60); 
+// Математика: 90 % 60 = 30 минут (остаток)
+const minutes = dbDuration % 60; 
+
+// Форматируем в строку 01:30 (добавляем нули слева)
+const hh = String(hours).padStart(2, '0');
+const mm = String(minutes).padStart(2, '0');
+
+// Записываем в твой новый инпут
+const durationField = document.getElementById('taskDuration');
+if (durationField) {
+    durationField.value = `${hh}:${mm}`;
+}
 
             if (!isFree) {
                 document.getElementById('price').value = task.price;
@@ -379,6 +411,11 @@ window.deleteTask = async (id) => {
 document.getElementById('taskModal')?.addEventListener('hidden.bs.modal', () => {
     editMode = false;
     editTaskId = null;
+
+const durationField = document.getElementById('taskDuration');
+    if (durationField) {
+        durationField.value = '00:30'; // Возвращаем дефолт
+    }
     
     // 1. Сброс стандартных полей формы
     const form = document.getElementById('task-form');

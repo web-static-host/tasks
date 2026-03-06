@@ -158,6 +158,7 @@ async function loadTasks() {
                         </td>
                     </tr>
                 `);
+                
             }
             lastDate = taskDate;
 
@@ -208,7 +209,9 @@ async function loadTasks() {
                             : '-'
                         }
                     </td>
-                    <td>${displayDate} | <strong>${displayTime}</strong></td>
+                    <td style="${t.status === 'Выполнено' ? 'color: #adb5bd;' : ''}">
+                         ${displayDate} | <strong>${displayTime}</strong>
+                    </td>
 
                     ${isPaid ? `<td style="max-width: 180px;"><small class="text-dark">${t.comment || ''}</small></td>` : ''}
 
@@ -230,6 +233,39 @@ async function loadTasks() {
                     </td>
                 </tr>
             `);
+            // ВСТАВЛЯТЬ СТРОГО СЮДА (ПОСЛЕ ОСНОВНОЙ СТРОКИ)
+            // --- ГЕНЕРАЦИЯ ФАНТОМНЫХ СТРОК (ДЛЯ ЛЮБОЙ ДЛИТЕЛЬНОСТИ) ---
+            let totalDuration = Number(t.duration) || 30; // Берем реальные минуты из базы
+            let spentDuration = 30; // Первые 30 мин уже заняты основной строкой
+
+            // Пока в запасе больше 30 минут, рисуем новые серые строки
+            while (totalDuration > spentDuration && currentTable === 'tasks' && t.time) {
+                const [h, m] = t.time.split(':').map(Number);
+                const nextDate = new Date();
+                
+                // Сдвигаем время: на 30, 60, 90... минут от начала задачи
+                nextDate.setHours(h, m + spentDuration, 0, 0);
+                const nextTime = `${String(nextDate.getHours()).padStart(2, '0')}:${String(nextDate.getMinutes()).padStart(2, '0')}`;
+
+                list.insertAdjacentHTML('beforeend', `
+                    <tr style="background-color: rgba(0,0,0,0.02); color: #999; border-left: 3px solid #dee2e6;">
+                        <td></td>
+                        ${showDept ? '<td></td>' : ''} 
+                        <td></td>
+                        <td></td>
+                        <td colspan="3" class="text-center" style="font-size: 0.8rem; font-style: italic;">
+                            ↳ Продолжение задачи #${t.id}
+                        </td>
+                        <td>${new Date(t.date).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'})} | <strong>${nextTime}</strong></td>
+                        ${isPaid ? '<td></td>' : ''}
+                        <td></td>
+                        <td><span class="badge bg-light text-muted border" style="font-weight: normal;">Занято</span></td>
+                        <td></td>
+                    </tr>
+                `);
+
+                spentDuration += 30; // Переходим к следующему слоту в цикле
+            }
         });
     } catch (e) { console.error(e); }
 }
