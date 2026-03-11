@@ -209,16 +209,16 @@ async function loadTasks() {
                             : '-'
                         }
                     </td>
-                    <td style="${t.status === 'Выполнено' ? 'color: #adb5bd;' : ''}">
+                    <td class="cell-datetime" style="${t.status === 'Выполнено' ? 'color: #adb5bd;' : ''}">
                          ${displayDate} | <strong>${displayTime}</strong>
                     </td>
 
                     ${isPaid ? `<td style="max-width: 180px;"><small class="text-dark">${t.comment || ''}</small></td>` : ''}
 
-                    <td>${t.price ? t.price + ' ₽' : '—'}</td>
-                    <td>${statusHTML}</td>
+                    <td class="cell-price">${t.price ? t.price + ' ₽' : '—'}</td>
+                    <td class="cell-status">${statusHTML}</td>
                     <td>
-                        <div class="d-flex gap-2 justify-content-center">
+                        <div class="d-flex gap-0 justify-content-center">
                             <button class="btn-action btn-edit" onclick="window.openEditTask(${t.id})" title="Редактировать">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:18px;"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
                             </button>
@@ -229,6 +229,19 @@ async function loadTasks() {
                             <button class="btn-action btn-delete" onclick="window.deleteTask(${t.id})" title="Удалить">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:18px;"><path d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
                             </button>
+                            ${currentUser.role === 'manager' ? `
+                            <button class="btn-action btn-copy" onclick="window.copyTask(${t.id})" title="Добавить копированием">
+                            <svg xmlns="http://www.w3.org/2000/svg" 
+                                viewBox="0 0 24 24" fill="none" 
+                                stroke="currentColor" stroke-width="1.5" 
+                                stroke-linecap="round" stroke-linejoin="round" 
+                                style="margin-top: 2px;"> <rect x="9" y="9" width="12" height="12" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                <line x1="15" y1="12" x2="15" y2="18"></line>
+                                <line x1="12" y1="15" x2="18" y2="15"></line>
+                            </svg>
+                            </button>
+                            ` : ''}
                         </div>
                     </td>
                 </tr>
@@ -256,10 +269,10 @@ async function loadTasks() {
                         <td colspan="3" class="text-center" style="font-size: 0.8rem; font-style: italic;">
                             ↳ Продолжение задачи #${t.id}
                         </td>
-                        <td>${new Date(t.date).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'})} | <strong>${nextTime}</strong></td>
+                        <td class="cell-datetime">${new Date(t.date).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'})} | <strong>${nextTime}</strong></td>
                         ${isPaid ? '<td></td>' : ''}
                         <td></td>
-                        <td><span class="badge bg-light text-muted border" style="font-weight: normal;">Занято</span></td>
+                        <td class="cell-status"><span class="badge bg-light text-muted border" style="font-weight: normal;">Занято</span></td>
                         <td></td>
                     </tr>
                 `);
@@ -305,21 +318,60 @@ document.addEventListener('change', (e) => {
     
     // Логика выбора категорий остается без изменений
     if (e.target.id === 'category') {
-        const cat = e.target.value;
-        const taskNameSelect = document.getElementById('taskName');
-        const options = {
-            '1С': ['Заказ 1С (локальной)', 'Отгрузка доп лицензии 1С', 'Отгрузка 1С:КП Отраслевой'],
-            '1С-ЭДО': ['Закрепление 1С-ЭДО', 'Закрепление 1С-ЭДО Фреш'],
-            '1С-ЭПД': ['Закрепление 1С-ЭПД', 'Закрепление 1С-ЭПД Фреш'],
-            'Техподдержка': ['Сервер', 'ПО', 'Консультация'],
-            'Внедрение': ['Настройка с нуля', 'Перенос']
-        };
+    const cat = e.target.value;
+    const taskNameSelect = document.getElementById('taskName');
+    
+    // Теперь задачи — это объекты { name, dur }
+    const options = {
+        '1С': [
+            { name: 'Заказ 1С (локальной)', dur: 30 },
+            { name: 'Отгрузка доп лицензии 1С', dur: 30 },
+            { name: 'Отгрузка 1С:КП Отраслевой', dur: 30 }
+        ],
+        '1С-ЭДО': [
+            { name: 'Закрепление 1С-ЭДО', dur: 30 },
+            { name: 'Закрепление 1С-ЭДО Фреш', dur: 30 }
+        ],
+        'Техподдержка': [
+            { name: 'Сервер', dur: 60 }, // Тут 1 час
+            { name: 'ПО', dur: 30 },
+            { name: 'Консультация', dur: 30 }
+        ],
+        'Внедрение': [
+            { name: 'Настройка с нуля', dur: 120 }, // Тут 2 часа
+            { name: 'Перенос', dur: 90 }           // Тут 1.5 часа
+        ]
+    };
+
+    taskNameSelect.innerHTML = '<option value="">Выберите задачу...</option>';
+    // Внутри блока if (e.target.id === 'category')
+const durationInput = document.getElementById('taskDuration');
+if (durationInput) durationInput.value = '00:30'; // Сбрасываем на дефолт при смене категории
+    
+    if (options[cat]) {
+        options[cat].forEach(opt => {
+            // Записываем длительность в data-атрибут, чтобы потом легко её достать
+            taskNameSelect.innerHTML += `<option value="${opt.name}" data-duration="${opt.dur}">${opt.name}</option>`;
+        });
+    }
+}
+});
+
+// Авто-подстановка времени при выборе конкретной задачи
+document.getElementById('taskName')?.addEventListener('change', (e) => {
+    const selectedOption = e.target.options[e.target.selectedIndex];
+    const duration = selectedOption.getAttribute('data-duration') || 30; // Берем время из тега
+    const durationInput = document.getElementById('taskDuration');
+
+    if (durationInput) {
+        // Конвертируем минуты в ЧЧ:ММ
+        const hh = String(Math.floor(duration / 60)).padStart(2, '0');
+        const mm = String(duration % 60).padStart(2, '0');
+        durationInput.value = `${hh}:${mm}`;
         
-        taskNameSelect.innerHTML = '<option value="">Выберите задачу...</option>';
-        if (options[cat]) {
-            options[cat].forEach(opt => {
-                taskNameSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
-            });
+        // Сразу вызываем обновление слотов, так как время изменилось
+        if (typeof updateFreeSlots === 'function') {
+            updateFreeSlots();
         }
     }
 });

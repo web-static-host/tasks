@@ -289,7 +289,6 @@ document.getElementById('task-form')?.addEventListener('submit', async (e) => {
     if (totalMinutes < 30) totalMinutes = 30;
 
     const taskData = {
-        dept: currentUser.dept,
         specialist: document.getElementById('specialist').value,
         category: categoryValue,
         task_name: taskNameValue,
@@ -467,3 +466,68 @@ document.getElementById('rescheduleModal')?.addEventListener('shown.bs.modal', f
 
 document.getElementById('category')?.addEventListener('change', () => updateFreeSlots());
 document.getElementById('taskName')?.addEventListener('change', () => updateFreeSlots());
+
+window.copyTask = async (id) => {
+    try {
+        const targetTable = (typeof currentTable !== 'undefined') ? currentTable : 'tasks';
+        const { data: task, error } = await supabase.from(targetTable).select('*').eq('id', id).single();
+        
+        if (error) throw error;
+
+        // ВАЖНО: Мы НЕ ставим editMode = true. 
+        // Это заставит форму думать, что мы создаем НОВУЮ задачу.
+        editMode = false;
+        editTaskId = null;
+
+        const isFree = targetTable === 'free_tasks';
+        const typeRadio = document.getElementById(isFree ? 'modalTypeFree' : 'modalTypePaid');
+        if (typeRadio) {
+            typeRadio.checked = true;
+            typeRadio.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        setTimeout(async () => {
+            // Заполняем поля из старой задачи
+            document.getElementById('category').value = task.category || '';
+            document.getElementById('category').dispatchEvent(new Event('change', { bubbles: true }));
+            document.getElementById('taskName').value = task.task_name;
+            document.getElementById('specialist').value = task.specialist;
+            document.getElementById('inn').value = task.inn;
+            document.getElementById('price').value = task.price || 0;
+            document.getElementById('taskComment').value = task.comment || '';
+
+            // ОЧИЩАЕМ поле Битрикс, 
+            document.getElementById('bitrix').value = '';
+
+            // Длительность
+            const durationField = document.getElementById('taskDuration');
+            if (durationField) {
+                const dbDuration = task.duration || 30;
+                const hours = Math.floor(dbDuration / 60);
+                const minutes = dbDuration % 60;
+                durationField.value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            }
+
+            if (!isFree) {
+                // Подставляем ту же дату и обновляем свободные слоты
+                const dateField = document.getElementById('date');
+                if (dateField._flatpickr) {
+                    dateField._flatpickr.setDate(task.date);
+                } else {
+                    dateField.value = task.date;
+                }
+                await updateFreeSlots(); // Загружаем актуальные слоты на эту дату
+            }
+
+            // Меняем заголовки, чтобы менеджер понимал, что создается копия
+            document.querySelector('#taskModal .modal-title').innerText = `Копирование задачи (Новая)`;
+            document.getElementById('submit-btn').innerText = "Создать копию";
+            
+            new bootstrap.Modal(document.getElementById('taskModal')).show();
+        }, 100);
+
+    } catch (e) { 
+        console.error(e);
+        alert("Ошибка при копировании"); 
+    }
+};

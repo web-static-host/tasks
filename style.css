@@ -14,10 +14,7 @@ body {
     border-top-right-radius: 12px !important;
 }
 
-.table td {
-    vertical-align: middle;
-    font-size: 0.9rem;
-}
+
 
 .table-responsive { 
     overflow: visible !important; 
@@ -45,8 +42,8 @@ body {
     border-top: 3px solid #b4b6b9 !important;
 }
 .day-divider td {
-    padding: 8px 15px !important;
-    font-size: 0.85rem;
+    padding: 4px 15px !important;
+    font-size: 11px;
     font-weight: bold;
     color: #0d6efd;
     text-transform: uppercase;
@@ -164,19 +161,7 @@ body {
     width: 300px; /* Слегка расширяется при фокусе */
 }
 
-/* КНОПКИ ДЕЙСТВИЙ В ТАБЛИЦЕ */
-.btn-action {
-    width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    border: none;
-    background: transparent;
-    color: #6c757d;
-}
+
 
 .btn-edit:hover, .btn-reschedule:hover {
     background-color: rgba(13, 110, 253, 0.1);
@@ -187,6 +172,12 @@ body {
 .btn-delete:hover {
     background-color: rgba(220, 53, 69, 0.1);
     color: #dc3545;
+    transform: translateY(-1px);
+}
+
+.btn-copy:hover {
+    background-color: rgba(25, 135, 84, 0.1); /* Зеленый Bootstrap (success) с прозрачностью */
+    color: #198754;
     transform: translateY(-1px);
 }
 
@@ -230,23 +221,103 @@ body {
     }
 }
 
-td:nth-child(8) { 
+/* Разрешаем перенос ВСЕМ ячейкам по умолчанию */
+.table td {
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+
+/* Запрещаем перенос ТОЛЬКО дате и цене (чтобы не рвались цифры) */
+.cell-datetime, 
+.cell-price {
     white-space: nowrap !important;
-    min-width: 140px; /* Даем колонке с временем достаточно места в одну строку */
+}
+
+/* Фиксируем ширину примечания, чтобы оно не раздувало таблицу */
+.cell-comment {
+    width: 180px !important;
+    min-width: 180px !important;
 }
 
 /* 1. Находим ячейку статуса (11-я колонка) */
-table td:nth-child(11) {
-    width: 110px !important;       /* Ограничиваем ширину ячейки */
-    white-space: normal !important; /* Разрешаем перенос в ячейке */
-    
+/* Ужимаем только ячейки, не трогая кнопки */
+.table td {
+    vertical-align: middle;
+    font-size: 13px !important;    /* Шрифт текста задачи */
+    padding: 4px 8px !important;   /* Минимальная высота строки */
+    line-height: 1.2;
 }
 
-/* 2. Сбрасываем запрет переноса у самого бейджа (Bootstrap-класса) */
-table td:nth-child(11) .badge {
-    white-space: normal !important; /* ГЛАВНОЕ: разрешаем перенос внутри плашки */
-    display: inline-block;          /* Позволяем блоку менять высоту */
-    width: 100%;                   /* Растягиваем на всю ширину ячейки */
-    text-align: center;             /* Выравниваем текст по левому краю */
-
+/* Колонку статуса находим по классу (теперь работает у всех ролей) */
+.cell-status {
+    width: 110px !important;
+    min-width: 110px;
+    white-space: normal !important; /* Разрешаем перенос */
 }
+
+/* Настройка текста внутри плашки статуса */
+.cell-status .badge {
+    white-space: normal !important;
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+    padding: 4px 2px !important;
+    font-size: 11px !important;
+    line-height: 1.1;
+}
+
+/* Компактный разделитель дней */
+.day-divider td {
+    padding: 4px 15px !important;
+    font-size: 11px !important;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 13px; /* Фиксированный размер для четкости */
+    padding: 2px 4px !important; /* Уменьшаем высоту строки */
+    line-height: 1.2;
+}
+
+/* КНОПКИ ДЕЙСТВИЙ В ТАБЛИЦЕ */
+.btn-action {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+    color: #6c757d;
+}
+
+/* Центрируем содержимое ячеек */
+.cell-datetime, 
+.cell-price, 
+.cell-status {
+    text-align: center !important;
+}
+
+/* Центрируем заголовки (шапку) */
+#th-date,
+#th-price,
+#th-status {
+    text-align: center !important;
+}
+
+/* Настройка ширины статуса и растягивание плашки */
+.cell-status {
+    width: 110px !important;
+    min-width: 110px;
+}
+
+.cell-status .badge {
+    display: inline-block;
+    width: 100%; /* Растягивает "Занято" и другие статусы на всю ширину */
+    text-align: center;
+    white-space: normal !important; /* Разрешает перенос текста */
+}
+
+
