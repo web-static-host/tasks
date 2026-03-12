@@ -288,6 +288,43 @@ document.getElementById('task-form')?.addEventListener('submit', async (e) => {
     // Защита от 0
     if (totalMinutes < 30) totalMinutes = 30;
 
+    // --- ПРОВЕРКА НАЛОЖЕНИЯ (ВСТАВИТЬ СЮДА) ---
+if (taskBillingType === 'paid') {
+    const spec = document.getElementById('specialist').value;
+    const timeValue = document.getElementById('time').value;
+    const dateValue = document.querySelector("#date")._flatpickr.selectedDates[0];
+    const formattedDate = document.querySelector("#date")._flatpickr.formatDate(dateValue, "Y-m-d");
+
+    // Твое новое время (в минутах от начала дня)
+    const [h, m] = timeValue.split(':').map(Number);
+    const newStart = h * 60 + m;
+    const newEnd = newStart + totalMinutes;
+
+    // Запрашиваем из базы все задачи этого спеца на этот день
+    const { data: others } = await supabase.from('tasks')
+        .select('id, time, duration')
+        .eq('specialist', spec)
+        .eq('date', formattedDate);
+
+    // Ищем, нет ли пересечений
+    const conflict = others?.find(t => {
+        if (editMode && String(t.id) === String(editTaskId)) return false; // игнорим себя
+        
+        const [th, tm] = t.time.substring(0, 5).split(':').map(Number);
+        const tStart = th * 60 + tm;
+        const tEnd = tStart + (Number(t.duration) || 30);
+
+        // Условие: начало новой раньше конца старой И конец новой позже начала старой
+        return newStart < tEnd && newEnd > tStart;
+    });
+
+    if (conflict) {
+        alert(`❌ Ошибка! Это время занято другой задачей (с ${conflict.time.substring(0, 5)}). Уменьшите длительность или выберите другое время.`);
+        btn.disabled = false;
+        return; // ВЫХОДИМ, ничего не сохраняем
+    }
+}
+
     const taskData = {
         specialist: document.getElementById('specialist').value,
         category: categoryValue,

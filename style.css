@@ -1,6 +1,26 @@
 /* ОБЩИЕ СТИЛИ СТРАНИЦЫ */
-body {
+html, body {
+    height: 100vh;
+    margin: 0;
+   /* Страница больше не прыгает */
     background-color: #f8f9fa;
+}
+
+/* 1. Скелет приложения */
+#main-content {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+     /* Запрещаем общий скролл */
+}
+
+/* 2. Контейнер, где лежат фильтры и карточка */
+#main-content > .container {
+    flex: 1; 
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Позволяет контейнеру сжиматься */
+    
 }
 
 .card {
@@ -16,8 +36,41 @@ body {
 
 
 
-.table-responsive { 
-    overflow: visible !important; 
+/* 3. Карточка с таблицей */
+.card.shadow-sm.border-0 {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Обязательно! */
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+/* 4. Зона скролла */
+.table-responsive {
+    height: 700px; /* Жесткая высота блока */
+    overflow-y: auto !important; /* Включаем вертикальный скролл */
+    border: 1px solid #dee2e6; /* Тонкая рамка вокруг */
+    background: #fff;
+}
+
+/* Названия столбцов прилипают к верху ящика */
+.table thead th {
+    position: sticky !important;
+    top: 0;
+    background-color: #f8f9fa !important;
+    z-index: 10;
+    border-bottom: 2px solid #dee2e6 !important;
+}
+
+/* Закругляем фон ПЕРВОЙ ячейки в шапке (слева) */
+.table thead th:first-child {
+    border-top-left-radius: 8px !important;
+}
+
+/* Закругляем фон ПОСЛЕДНЕЙ ячейки в шапке (справа) */
+.table thead th:last-child {
+    border-top-right-radius: 8px !important;
 }
 
 #submit-btn:disabled {
@@ -63,27 +116,27 @@ body {
 
 /* ОБЪЕДИНЕННАЯ ПАНЕЛЬ ФИЛЬТРОВ И ВКЛАДОК */
 .filter-panel {
-    background: #ffffff;
-    border-radius: 16px;
-    border: 1px solid #f1f3f5;
-    margin-bottom: 20px;
-    overflow: hidden; /* Важно для вкладок */
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    flex-shrink: 0; /* Фильтры не будут сплющиваться */
+    background: #ffffff !important;
+    margin-top: 10px !important;
+    border-radius: 12px;
 }
+
+
 
 /* СТИЛИ ВКЛАДОК (TABS) */
 .nav-tabs {
     background-color: #f8f9fa;
     padding: 0 15px;
-    gap: 5px;
+    gap: 2px;
     border-bottom: 1px solid #dee2e6;
 }
 
 .nav-tabs .nav-link {
     border: none;
     color: #6c757d;
-    padding: 12px 20px;
-    font-size: 0.85rem;
+    padding: 6px 15px;
+    font-size: 0.8rem;
     letter-spacing: 0.5px;
     transition: all 0.2s ease;
     border-bottom: 3px solid transparent;
@@ -123,7 +176,7 @@ body {
 
 /* ПОИСК */
 .search-container {
-    max-width: 350px;
+    max-width: 280px;
     position: relative;
 }
 
@@ -145,12 +198,13 @@ body {
 
 .form-search {
     width: 250px; /* Базовая ширина */
-    padding: 8px 12px 8px 35px;
-    font-size: 0.95rem;
+    padding: 5px 12px 5px 35px;
+    font-size: 0.85rem;
     border: 1px solid #dee2e6;
     border-radius: 50px; 
     background-color: #f8f9fa;
     transition: all 0.3s ease;
+    height: 32px;
 }
 
 .form-search:focus {
@@ -158,7 +212,7 @@ body {
     background-color: #fff;
     border-color: #0d6efd;
     box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
-    width: 300px; /* Слегка расширяется при фокусе */
+    width: 280px; /* Слегка расширяется при фокусе */
 }
 
 
@@ -197,8 +251,9 @@ body {
 /* КНОПКА НОВОЙ ЗАДАЧИ */
 #add-task-btn {
     font-weight: 600;
-    border-radius: 8px;
-    padding: 8px 20px;
+    border-radius: 15px;
+    padding: 5px 15px !important; /* Было 8px 20px - уменьшаем высоту и ширину */
+    font-size: 0.85rem
 }
 
 /* АДАПТИВНОСТЬ */
@@ -320,4 +375,64 @@ body {
     white-space: normal !important; /* Разрешает перенос текста */
 }
 
+
+.navbar {
+    position: sticky !important;
+    top: 0;
+    z-index: 1050;
+    margin-bottom: 0 !important; /* Критично: убираем mb-4 из HTML */
+    height: 44px !important;    /* Фиксируем высоту, чтобы фильтры знали, куда липнуть */
+    display: flex;
+    align-items: center;
+    box-shadow: none
+}
+.navbar-brand {
+    font-size: 1rem !important;
+}
+
+
+
+.filter-panel .p-3 {
+    padding: 0.6rem 1rem !important; /* Было 1rem (p-3) */
+}
+
+/* Прижимаем блок специалистов к линии разграничения */
+#tech-filters-container.pb-3 {
+    padding-bottom: 0.5rem !important; /* Было 1rem */
+}
+
+/* Ужимаем отступы во вкладках (верхняя часть фильтра) */
+.filter-panel .px-3.pt-2 {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    padding-top: 4px !important; /* Было больше */
+}
+
+/* Делаем кнопки фильтра даты меньше */
+[name="filterDate"] + label.btn {
+    padding: 3px 12px !important;
+    font-size: 0.85rem !important;
+}
+
+/* Уменьшаем высоту выбора даты (календарик в фильтре) */
+#filterCustomDate {
+    height: 30px !important;
+    padding: 2px 5px !important;
+    font-size: 0.85rem !important;
+}
+
+/* Прижимаем переключатель "Скрыть выполненные" */
+.form-check.form-switch {
+    font-size: 0.85rem !important;
+}
+.form-check-input {
+    width: 2.2em !important; /* Чуть короче сам тумблер */
+    height: 1.1em !important;
+}
+
+/* Убираем лишнее пространство вокруг блока исполнителей */
+#tech-filters-container {
+    margin-bottom: 0.6rem !important; /* Уменьшили внешний отступ до линии */
+    padding-bottom: 0.6rem !important; /* Уменьшили внутренний зазор до линии */
+}
 

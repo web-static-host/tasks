@@ -151,15 +151,18 @@ async function loadTasks() {
             const taskDate = t.date || (t.created_at ? t.created_at.split('T')[0] : '');
 
             if (lastDate && taskDate !== lastDate) {
-                list.insertAdjacentHTML('beforeend', `
-                    <tr class="day-divider">
-                        <td colspan="${totalCols}" class="bg-light fw-bold py-2 px-3 border-bottom">
-                            ${new Date(taskDate).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
-                        </td>
-                    </tr>
-                `);
-                
-            }
+    // Проверяем: эта дата сегодня или она первая в списке после вчерашних?
+    const isToday = taskDate === todayStr;
+
+    list.insertAdjacentHTML('beforeend', `
+        <tr class="day-divider day-header" data-date="${taskDate}">
+            <td colspan="${totalCols}" class="bg-light fw-bold py-2 px-3 border-bottom">
+                ${new Date(taskDate).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
+                ${isToday ? '<span class="badge bg-primary ms-2">Сегодня</span>' : ''}
+            </td>
+        </tr>
+    `);
+}
             lastDate = taskDate;
 
             const displayDate = new Date(taskDate).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'});
@@ -280,6 +283,7 @@ async function loadTasks() {
                 spentDuration += 30; // Переходим к следующему слоту в цикле
             }
         });
+        setTimeout(scrollToToday, 100);
     } catch (e) { console.error(e); }
 }
 // ЛОГИКА МОДАЛЬНОГО ОКНА (ВОССТАНОВЛЕНО)
@@ -375,3 +379,34 @@ document.getElementById('taskName')?.addEventListener('change', (e) => {
         }
     }
 });
+
+function scrollToToday() {
+    const container = document.querySelector('.table-responsive');
+    const dayHeaders = document.querySelectorAll('.day-header');
+    const tableHeader = document.querySelector('thead'); // Находим саму шапку
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    let targetRow = null;
+
+    // Ищем сегодня или ближайший будущий день
+    for (let header of dayHeaders) {
+        const headerDate = header.getAttribute('data-date');
+        if (headerDate >= todayStr) {
+            targetRow = header;
+            break; 
+        }
+    }
+
+    if (targetRow && container) {
+        // Вычисляем высоту липкой шапки (обычно ~40-50px)
+        const headerHeight = tableHeader ? tableHeader.offsetHeight : 0;
+        
+        // Позиция строки МИНУС высота шапки
+        const rowPos = targetRow.offsetTop - headerHeight;
+        
+        container.scrollTo({
+            top: rowPos,
+            behavior: 'smooth'
+        });
+    }
+}
