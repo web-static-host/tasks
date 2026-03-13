@@ -165,6 +165,9 @@ async function loadTasks() {
 }
             lastDate = taskDate;
 
+            const grayStatuses = ['Выполнено', 'Возврат', 'Ожидание от клиента', 'Ожидание от менеджера', 'Ожидание от тех.спеца', 'Не отвечает'];
+            const isGrayStatus = grayStatuses.includes(t.status);
+
             const displayDate = new Date(taskDate).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'});
             const displayTime = t.time ? t.time.substring(0, 5) : '—';
             const secondCol = currentUser.role === 'manager' ? t.specialist : t.manager;
@@ -176,27 +179,45 @@ async function loadTasks() {
             if (s === 'взят в работу') badgeClass = 'bg-primary';
             if (s === 'возврат') badgeClass = 'bg-danger';
             if (s.includes('ожидание')) badgeClass = 'bg-warning text-dark';
+            if (s === 'не отвечает') badgeClass = 'bg-warning text-dark';
+            if (s === 'перенесен') badgeClass = 'bg-primary';
 
             let statusHTML = `<span class="badge ${badgeClass}">${t.status}</span>`;
 
-            if (currentUser.role === 'specialist') {
-                statusHTML = `
-                    <div class="dropdown">
-                        <button class="badge ${badgeClass} dropdown-toggle border-0 status-dropdown" data-bs-toggle="dropdown" style="cursor:pointer">
-                            ${t.status}
-                        </button>
-                        <ul class="dropdown-menu shadow">
-                            <li><a class="dropdown-item" href="#" onclick="window.updateTaskStatus(${t.id}, 'Взят в работу')">Взят в работу</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="window.updateTaskStatus(${t.id}, 'Выполнено')">Выполнено</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от клиента')">Ожидание от клиента</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от менеджера')">Ожидание от менеджера</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от тех.спеца')">Ожидание от тех.спеца</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" onclick="window.updateTaskStatus(${t.id}, 'Возврат')">Возврат</a></li>
-                        </ul>
-                    </div>`;
-            }
+            
+    statusHTML = `
+        <div class="dropdown">
+            <button class="badge ${badgeClass} dropdown-toggle border-0 status-dropdown" 
+                    data-bs-toggle="dropdown" 
+                    style="cursor:pointer"
+                    onclick="window.loadQuickHistory(${t.id})">
+                ${t.status}
+            </button>
+            <ul class="dropdown-menu shadow-lg p-0" style="min-width: 500px;">
+                <div class="d-flex">
+                    <div class="flex-grow-1 border-end" style="width: 50%;">
+                        <li class="p-2 bg-light border-bottom fw-bold small text-center text-uppercase">Сменить статус</li>
+                        <li><a class="dropdown-item py-2" href="#" onclick="window.updateTaskStatus(${t.id}, 'Взят в работу')">Взят в работу</a></li>
+                        <li><a class="dropdown-item py-2" href="#" onclick="window.updateTaskStatus(${t.id}, 'Выполнено')">Выполнено</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-1" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от клиента')">Ожидание от клиента</a></li>
+                        <li><a class="dropdown-item py-1" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от менеджера')">Ожидание от менеджера</a></li>
+                        <li><a class="dropdown-item py-1" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от тех.спеца')">Ожидание от тех.спеца</a></li>
+                        <li><a class="dropdown-item py-1" href="#" onclick="window.updateTaskStatus(${t.id}, 'Не отвечает')">Не отвечает</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="#" onclick="window.updateTaskStatus(${t.id}, 'Возврат')">Возврат</a></li>
+                    </div>
+
+                    <div style="width: 50%; max-height: 350px; overflow-y: auto; background: #fdfdfd;">
+                        <li class="p-2 bg-light border-bottom fw-bold small text-center text-uppercase" style="position: sticky; top: 0; z-index: 1;">История</li>
+                        <div id="quick-history-${t.id}" class="p-3 small text-muted">
+                            <div class="text-center py-3">Загрузка...</div>
+                        </div>
+                    </div>
+                </div>
+            </ul>
+        </div>`;
+
 
             list.insertAdjacentHTML('beforeend', `
                 <tr>
@@ -212,8 +233,8 @@ async function loadTasks() {
                             : '-'
                         }
                     </td>
-                    <td class="cell-datetime" style="${t.status === 'Выполнено' ? 'color: #adb5bd;' : ''}">
-                         ${displayDate} | <strong>${displayTime}</strong>
+                    <td class="cell-datetime" style="${isGrayStatus ? 'color: #adb5bd; opacity: 0.6;' : ''}">
+                     ${displayDate} | <strong>${displayTime}</strong>
                     </td>
 
                     ${isPaid ? `<td style="max-width: 180px;"><small class="text-dark">${t.comment || ''}</small></td>` : ''}
@@ -410,3 +431,88 @@ function scrollToToday() {
         });
     }
 }
+
+window.loadQuickHistory = async (taskId) => {
+    const container = document.getElementById(`quick-history-${taskId}`);
+    if (!container) return;
+
+    try {
+        const { data, error } = await supabase
+            .from('task_history')
+            .select('*')
+            .eq('task_id', taskId)
+            .order('created_at', { ascending: false });
+
+        if (error || !data?.length) {
+            container.innerHTML = '<div class="text-center py-2 text-muted">История пуста</div>';
+            return;
+        }
+
+        container.innerHTML = data.map(item => {
+            // ЧЕЛОВЕЧЕСКАЯ ДАТА: 12.03.2026 10:05
+            const fullDate = new Date(item.created_at).toLocaleString('ru-RU', {
+                day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            
+            let details = [];
+            if (item.action_type === 'create') {
+                details.push(`<span class="text-success fw-bold">Создана задача</span>`);
+            } else if (item.changes) {
+                const labels = {
+                    status: 'Статус', price: 'Цена', date: 'Дата', time: 'Время',
+                    duration: 'Длительность', comment: 'Коммент', inn: 'ИНН', bitrix_url: 'Битрикс'
+                };
+
+                Object.entries(item.changes).forEach(([key, val]) => {
+                    const label = labels[key] || key;
+                    let n = val.new !== undefined ? val.new : val;
+                    let o = val.old;
+
+                    // Форматирование значений
+                    if (key === 'price') { n += ' ₽'; if(o !== undefined) o += ' ₽'; }
+
+if (key === 'duration') {
+    const toText = (m) => {
+        const hrs = Math.floor(m / 60);
+        const mins = m % 60;
+        return `${hrs > 0 ? hrs + ' ч. ' : ''}${mins > 0 ? mins + ' мин.' : (hrs > 0 ? '' : '0 мин.')}`.trim();
+    };
+    n = toText(n);
+    if(o !== undefined) o = toText(o);
+}
+                    
+                    // Дату внутри изменений (если перенесено) тоже делаем понятной
+                    if (key === 'date') {
+                        n = new Date(n).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric'});
+                        if(o) o = new Date(o).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric'});
+                    }
+
+                    if (o !== undefined && o !== null) {
+                        details.push(`${label}: <b>${n}</b> <span class="text-muted" style="font-size: 0.65rem;">(было ${o})</span>`);
+                    } else {
+                        details.push(`${label}: <b>${n}</b>`);
+                    }
+                });
+            }
+            if (item.comment) {
+                details.push(`<div class="mt-1 text-dark" style="font-style: italic; font-size: 0.75rem; border-top: 1px dashed #eee; padding-top: 2px;">
+                    💬 ${item.comment}
+                </div>`);
+            }
+
+            return `
+                <div class="mb-2 pb-2 border-bottom">
+                    <div class="fw-bold text-dark mb-1" style="font-size: 0.7rem;">
+                        <span class="text-primary">[${fullDate}]</span> ${item.user_name}
+                    </div>
+                    <div class="ps-1 text-secondary" style="border-left: 1.5px solid #ddd;">
+                        ${details.join('<br>')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (e) {
+        container.innerHTML = '<div class="text-danger small">Ошибка данных</div>';
+    }
+};
