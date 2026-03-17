@@ -193,29 +193,44 @@ async function loadTasks() {
                     onclick="window.loadQuickHistory(${t.id})">
                 ${t.status}
             </button>
-            <ul class="dropdown-menu shadow-lg p-0" style="min-width: 500px;">
-                <div class="d-flex">
-                    <div class="flex-grow-1 border-end" style="width: 50%;">
-                        <li class="p-2 bg-light border-bottom fw-bold small text-center text-uppercase">Сменить статус</li>
-                        <li><a class="dropdown-item py-2" href="#" onclick="window.updateTaskStatus(${t.id}, 'Взят в работу')">Взят в работу</a></li>
-                        <li><a class="dropdown-item py-2" href="#" onclick="window.updateTaskStatus(${t.id}, 'Выполнено')">Выполнено</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item py-1" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от клиента')">Ожидание от клиента</a></li>
-                        <li><a class="dropdown-item py-1" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от менеджера')">Ожидание от менеджера</a></li>
-                        <li><a class="dropdown-item py-1" href="#" onclick="window.updateTaskStatus(${t.id}, 'Ожидание от тех.спеца')">Ожидание от тех.спеца</a></li>
-                        <li><a class="dropdown-item py-1" href="#" onclick="window.updateTaskStatus(${t.id}, 'Не отвечает')">Не отвечает</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="#" onclick="window.updateTaskStatus(${t.id}, 'Возврат')">Возврат</a></li>
-                    </div>
+            <ul class="dropdown-menu shadow-lg p-0" style="min-width: 550px;" onclick="event.stopPropagation()">
+    <div class="d-flex" style="position: relative; min-height: 300px;">
+        <div class="border-end" style="width: 40%; flex-shrink: 0; position: relative;">
+            <div id="status-list-${t.id}">
+                <li class="p-2 bg-light border-bottom fw-bold small text-center text-uppercase">Сменить статус</li>
+                
+                <li><a class="dropdown-item py-2" href="#" onclick="window.prepareStatusChange(${t.id}, 'Взят в работу')">Взят в работу</a></li>
+                <li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="window.prepareStatusChange(${t.id}, 'Выполнено')">Выполнено</a></li>
+                <li class="mb-2"><a class="dropdown-item py-2 text-danger fw-bold" href="#" onclick="window.prepareStatusChange(${t.id}, 'Возврат')">Возврат</a></li>
+                
+                <li class="p-2 bg-light border-top border-bottom fw-bold small text-center text-uppercase">Поставить на паузу</li>
+                
+                <li><a class="dropdown-item py-2" href="#" onclick="window.prepareStatusChange(${t.id}, 'Ожидание от клиента')">Ожидание от клиента</a></li>
+                <li><a class="dropdown-item py-2" href="#" onclick="window.prepareStatusChange(${t.id}, 'Ожидание от менеджера')">Ожидание от менеджера</a></li>
+                <li><a class="dropdown-item py-2" href="#" onclick="window.prepareStatusChange(${t.id}, 'Ожидание от тех.спеца')">Ожидание от тех.спеца</a></li>
+                <li class="mb-2"><a class="dropdown-item py-2" href="#" onclick="window.prepareStatusChange(${t.id}, 'Не отвечает')">Не отвечает</a></li>
+            </div>
 
-                    <div style="width: 50%; max-height: 350px; overflow-y: auto; background: #fdfdfd;">
-                        <li class="p-2 bg-light border-bottom fw-bold small text-center text-uppercase" style="position: sticky; top: 0; z-index: 1;">История</li>
-                        <div id="quick-history-${t.id}" class="p-3 small text-muted">
-                            <div class="text-center py-3">Загрузка...</div>
-                        </div>
+            <div id="comment-area-${t.id}" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white p-2" style="z-index: 10;">
+                <div class="d-flex flex-column h-100">
+                    <div class="small fw-bold mb-1 text-primary" id="target-status-name-${t.id}"></div>
+                    <textarea id="status-comment-input-${t.id}" class="form-control form-control-sm mb-2 flex-grow-1" placeholder="Комментарий..."></textarea>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary w-50" onclick="window.cancelStatusChange(${t.id})">Отмена</button>
+                        <button class="btn btn-sm btn-primary w-50" id="confirm-status-btn-${t.id}">ОК</button>
                     </div>
                 </div>
-            </ul>
+            </div>
+        </div>
+
+        <div style="width: 60%; max-height: 400px; overflow-y: auto; background: #fdfdfd;">
+            <li class="p-2 bg-light border-bottom fw-bold small text-center text-uppercase" style="position: sticky; top: 0; z-index: 1;">История</li>
+            <div id="quick-history-${t.id}" class="p-3 small text-muted">
+                <div class="text-center py-3">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+</ul>
         </div>`;
 
 

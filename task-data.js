@@ -151,41 +151,104 @@ document.getElementById('specialist')?.addEventListener('change', () => updateFr
 
 
 // 3. УПРАВЛЕНИЕ СТАТУСОМ (Сделал глобальными)
+// 1. Показываем поле комментария
+window.prepareStatusChange = (id, status) => {
+    // Останавливаем закрытие дропдауна Bootstrap
+    event.preventDefault();
+    event.stopPropagation();
+
+    const area = document.getElementById(`comment-area-${id}`);
+    const nameLabel = document.getElementById(`target-status-name-${id}`);
+    const btn = document.getElementById(`confirm-status-btn-${id}`);
+    const input = document.getElementById(`status-comment-input-${id}`);
+
+    if (!area) return;
+
+    nameLabel.innerText = status;
+    area.classList.remove('d-none'); // Показываем блок
+    input.value = '';
+    input.focus();
+
+    btn.onclick = async () => {
+        const comment = input.value.trim();
+        await window.updateTaskStatus(id, status, comment);
+        // После сохранения закрываем все меню
+        const dropdown = btn.closest('.dropdown-menu');
+        if (dropdown) dropdown.classList.remove('show');
+    };
+};
+
+// 2. Отмена (просто скрываем блок комментария)
+window.cancelStatusChange = (id) => {
+    event.preventDefault();
+    event.stopPropagation();
+    document.getElementById(`comment-area-${id}`).classList.add('d-none');
+};
+
+// 3. Сохранение в базу
 window.updateTaskStatus = async (id, newStatus, comment = null) => {
     try {
-        // 1. Сначала узнаем старый статус для истории
-        const { data: oldTask } = await supabase.from(currentTable).select('status').eq('id', id).single();
-        
+        // 1. Определяем таблицу (если currentTable вдруг не определена)
+        const targetTable = (typeof currentTable !== 'undefined') ? currentTable : 'tasks';
+
+        // 2. Получаем текущий статус для проверки изменений
+        const { data: oldTask, error: fetchError } = await supabase
+            .from(targetTable)
+            .select('status')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // 3. Готовим данные для обновления
         const updateData = { status: newStatus };
 
-        // --- ИЗМЕНЕНИЯ ТУТ ---
-        // Список статусов, при которых время должно освобождаться
-        const freeTimeStatuses = [
-            'Выполнено', 
-            'Возврат', 
-            'Ожидание от клиента', 
-            'Ожидание от менеджера', 
-            'Ожидание от тех.спеца', 
-            'Не отвечает'
-        ];
-
+        // Если статус "завершающий", обнуляем длительность
+        const freeTimeStatuses = ['Выполнено', 'Возврат', 'Ожидание от клиента', 'Ожидание от менеджера', 'Ожидание от тех.спеца', 'Не отвечает'];
         if (freeTimeStatuses.includes(newStatus)) {
             updateData.duration = 0;
         }
-        // ----------------------
 
-        const { error } = await supabase.from(currentTable).update(updateData).eq('id', id);
-        if (error) throw error;
+        // 4. ОБНОВЛЯЕМ БАЗУ (Самый важный этап)
+        const { error: updateError } = await supabase
+            .from(targetTable)
+            .update(updateData)
+            .eq('id', id);
 
-        // 2. Записываем в историю (только если статус реально изменился)
+        if (updateError) {
+            alert("Ошибка при обновлении статуса в базе");
+            throw updateError;
+        }
+
+        // 5. ЗАПИСЫВАЕМ В ИСТОРИЮ (только если статус реально изменился)
         if (oldTask && oldTask.status !== newStatus) {
             await logTaskAction(id, 'status_change', { 
                 status: { old: oldTask.status, new: newStatus } 
             }, comment);
         }
 
-        loadTasks();
-    } catch (e) { console.error(e); }
+        // 6. ФИНАЛ: Закрываем меню и обновляем интерфейс
+        // Находим открытое меню и принудительно его гасим
+        const openDropdown = document.querySelector('.dropdown-menu.show');
+        if (openDropdown) {
+            openDropdown.classList.remove('show');
+            // Если используешь Bootstrap 5, лучше так:
+            const parent = openDropdown.closest('.dropdown');
+            if (parent) {
+                const toggle = parent.querySelector('[data-bs-toggle="dropdown"]');
+                if (toggle) bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
+            }
+        }
+
+        // Вызываем твою функцию перерисовки таблицы
+        if (typeof loadTasks === 'function') {
+            await loadTasks(); 
+        }
+
+    } catch (e) { 
+        console.error('Критическая ошибка обновления:', e);
+        alert("Не удалось обновить статус. Проверь консоль.");
+    }
 };
 
 window.handleBitrixClick = async (id, currentStatus) => {
@@ -430,32 +493,39 @@ const conflict = others?.find(t => {
     }
 }
 
+    // Собираем основные данные
     const taskData = {
         specialist: document.getElementById('specialist').value,
         category: categoryValue,
         task_name: taskNameValue,
         inn: document.getElementById('inn').value,
         bitrix_url: document.getElementById('bitrix').value,
-        duration: totalMinutes // Теперь пишем реальные минуты из инпута
+        duration: totalMinutes 
     };
 
-    // 2. Добавляем имя менеджера ТОЛЬКО если это создание новой задачи
+    // --- ЛОГИКА ДЛЯ ОТДЕЛА И МЕНЕДЖЕРА ---
     if (!editMode) {
+        // Если это НОВАЯ задача — записываем отдел и имя из профиля
         taskData.manager = currentUser.name;
+        taskData.dept = currentUser.dept; // Берем отдел текущего пользователя
+        taskData.status = 'Новая';
     }
+    // Если editMode = true, мы НЕ добавляем dept в taskData, 
+    // поэтому при update старый отдел в базе не затрется.
+    // -------------------------------------
 
-    if (taskBillingType === 'paid') {
-        taskData.date = document.querySelector("#date")._flatpickr.formatDate(
-    document.querySelector("#date")._flatpickr.selectedDates[0], 
-    "Y-m-d"
-);
-        taskData.time = document.getElementById('time').value;
-        taskData.price = parseInt(document.getElementById('price').value) || 0;
-        taskData.comment = document.getElementById('taskComment').value; // Коммент только для платных
-    } else {
-        taskData.date = new Date().toISOString().split('T')[0];
-        // Для бесплатных коммент не добавляем, так как в таблице free_tasks нет такой колонки
-    }
+    if (taskBillingType === 'paid') {
+        // ... твой существующий код для даты, цены и т.д. ...
+        taskData.date = document.querySelector("#date")._flatpickr.formatDate(
+            document.querySelector("#date")._flatpickr.selectedDates[0], 
+            "Y-m-d"
+        );
+        taskData.time = document.getElementById('time').value;
+        taskData.price = parseInt(document.getElementById('price').value) || 0;
+        taskData.comment = document.getElementById('taskComment').value;
+    } else {
+        taskData.date = new Date().toISOString().split('T')[0];
+    }
 
     let result;
     if (editMode) {
