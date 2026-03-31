@@ -436,3 +436,22 @@ html, body {
     padding-bottom: 0.6rem !important; /* Уменьшили внутренний зазор до линии */
 }
 
+#busy-task-btn {
+    font-weight: 600;
+    border-radius: 15px; /* Копируем твое скругление */
+    padding: 5px 15px !important; /* Копируем твои отступы */
+    font-size: 0.85rem; /* Копируем размер шрифта */
+    
+    /* Тот самый серо-голубой оттенок */
+    background-color: #6c869b !important; 
+    border: 1px solid #6c869b !important;
+    color: white !important;
+    transition: all 0.2s ease;
+}
+
+#busy-task-btn:hover {
+    background-color: #5a7184 !important;
+    border-color: #5a7184 !important;
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
+}
+

@@ -20,12 +20,14 @@ const CONFIG = {
         "Свиридкин А.В.": {
             start: "08:30",
             end: "17:30",
+            friday_end: "16:15",
             lunch: { start: "12:00", end: "13:00" },
             interval: 30 
         },
         "Мурадов Р.А.": {
             start: "09:00",
             end: "18:00",
+            friday_end: "16:45",
             lunch: { start: "13:00", end: "14:00" },
             interval: 30
         }
