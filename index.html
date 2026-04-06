@@ -13,26 +13,55 @@
 </head>
 <body id="app-body" style="display: none;">
     <div id="auth-screen" class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-4">
-                <div class="card shadow border-0">
-                    <div class="card-body text-center p-4">
-                        <h4 class="mb-4">Вход в систему</h4>
-                        <select id="user-select" class="form-select mb-3">
-                            <option value="">Выберите пользователя...</option>
-                        </select>
-                        <button onclick="login()" class="btn btn-primary w-100">Войти</button>
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card shadow border-0" style="border-radius: 15px;">
+                <div class="card-body text-center p-4">
+                    <div class="mb-4">
+                        <h4 class="fw-bold">Технический портал</h4>
+                        <p class="text-muted small">Введите данные для входа</p>
+                    </div>
+                    
+                    <form id="login-form" onsubmit="login(event)">
+                        <div class="mb-3">
+                            <input type="text" id="username" name="username" class="form-control" 
+                                   placeholder="Логин" required autocomplete="username">
+                        </div>
+                        <div class="mb-3">
+                            <input type="password" id="password" name="password" class="form-control" 
+                                   placeholder="Пароль" required autocomplete="current-password">
+                        </div>
+                        <div class="form-check text-start mb-3 small">
+                            <input class="form-check-input" type="checkbox" id="rememberMe" checked>
+                            <label class="form-check-label" for="rememberMe">
+                                Запомнить меня
+                            </label>
+                        </div>
+                        <button type="submit" id="login-btn" class="btn btn-primary w-100 py-2 shadow-sm">
+                            Войти
+                        </button>
+                    </form>
+                    
+                    <div id="login-error" class="alert alert-danger mt-3 d-none small p-2">
+                        Неверный логин или пароль
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
     <div id="main-content" style="display: none;">
         <nav class="navbar navbar-dark bg-dark">
             <div class="container d-flex justify-content-between align-items-center">
                 <span class="navbar-brand">Технический портал</span>
+                
                 <div class="d-flex align-items-center">
+                    <a id="admin-link" class="text-light me-3 d-none" title="Панель администратора" style="cursor: pointer;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="admin-gear" viewBox="0 0 16 16">
+            <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/>
+        </svg>
+    </a>
                     <span id="user-info" class="badge bg-secondary me-3"></span>
                     <button onclick="logout()" class="btn btn-sm btn-outline-light">Выйти</button>
                 </div>
@@ -156,8 +185,6 @@
                                 <label class="form-label fw-bold mb-1 small">1. Тип работы и исполнитель</label>
                                 <select id="category" class="form-select form-select-sm mb-2" required>
                                     <option value="">Выберите категорию...</option>
-                                    <option value="Техподдержка">Техподдержка</option>
-                                    <option value="Внедрение">Внедрение</option>
                                 </select>
                                 <select id="taskName" class="form-select form-select-sm mb-2" required>
                                     <option value="">Выберите задачу...</option>
@@ -332,9 +359,6 @@
 
     <!-- Таблица задач: загрузка задач из Supabase, отображение таблицы, группировка по датам, история изменений, прокрутка к текущему дню -->
     <script src="tasks-table.js"></script>
-
-    <!-- Инициализация приложения: запуск Supabase, загрузка пользователя из localStorage, настройка интерфейса и запуск всей системы -->
-    <script src="init.js"></script>
 
     <!-- Занятие времени тех спецом /отпуск /больничный /встреча -->
     <script src="tech-busy.js"></script>

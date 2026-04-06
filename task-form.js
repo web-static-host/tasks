@@ -1,6 +1,20 @@
 let editMode = false;
 let editTaskId = null;
 
+// Функция-загрузчик данных из БД
+async function loadTaskCatalog() {
+    const { data, error } = await supabase
+        .from('task_catalog')
+        .select('*')
+        .eq('is_active', true); // Берем только активные задачи
+
+    if (error) return console.error("Ошибка каталога:", error);
+    
+    // Сохраняем в глобальную переменную, чтобы не делать запросы при каждом клике
+    window.taskCatalog = data; 
+    console.log("Каталог задач загружен из БД");
+}
+
 document.getElementById('task-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submit-btn');
@@ -314,13 +328,94 @@ const durationField = document.getElementById('taskDuration');
 });
 
 // Инициализация календаря в главной модалке
-document.getElementById('taskModal')?.addEventListener('shown.bs.modal', function () {
-     flatpickr("#date", {
-         ...flatpickrConfig,
-         onChange: function() {
-             updateFreeSlots(); // Запуск поиска времени
+// Инициализация модалки: Календарь + Загрузка данных из БД
+document.getElementById('taskModal')?.addEventListener('shown.bs.modal', async () => {
+    // 1. ВОЗВРАЩАЕМ КАЛЕНДАРЬ (без этого дата не работает)
+    flatpickr("#date", {
+        ...flatpickrConfig, // Твой глобальный конфиг из начала файла
+        onChange: function() {
+            if (typeof updateFreeSlots === 'function') updateFreeSlots();
         }
-     });
+    });
+
+    const categorySelect = document.getElementById('category');
+    categorySelect.innerHTML = '<option value="">Загрузка...</option>';
+
+    // 2. ЗАГРУЖАЕМ ДАННЫЕ ИЗ БД
+    const { data, error } = await supabase
+        .from('task_catalog')
+        .select('*')
+        .eq('is_active', true);
+
+    if (error) {
+        console.error("Ошибка загрузки каталога:", error);
+        categorySelect.innerHTML = '<option value="">Ошибка загрузки</option>';
+        return;
+    }
+
+    window.taskCatalog = data;
+    
+    // 3. ОТРИСОВЫВАЕМ КАТЕГОРИИ СРАЗУ
+    renderCategories();
+});
+
+function renderCategories() {
+    const categorySelect = document.getElementById('category');
+    const typeRadio = document.querySelector('input[name="modalTaskType"]:checked');
+    
+    if (!window.taskCatalog || !typeRadio) return;
+
+    const isFree = typeRadio.value === 'free';
+
+    // Фильтруем категории из загруженного каталога
+    const availableCategories = [...new Set(window.taskCatalog
+        .filter(item => item.is_paid === !isFree)
+        .map(item => item.category))];
+
+    categorySelect.innerHTML = '<option value="">Выберите категорию...</option>';
+    availableCategories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        categorySelect.appendChild(opt);
+    });
+}
+
+document.addEventListener('change', (e) => {
+    // Если переключили Платная/Бесплатная — перерисовываем категории
+    if (e.target.name === 'modalTaskType') {
+        renderCategories();
+        
+        // Скрываем/показываем блоки (твоя логика)
+        const isFree = e.target.value === 'free';
+        document.getElementById('dateTimeBlock')?.classList.toggle('d-none', isFree);
+        document.getElementById('priceBlock')?.classList.toggle('d-none', isFree);
+        document.getElementById('commentBlock')?.classList.toggle('d-none', isFree);
+    }
+
+    // Если выбрали Категорию — наполняем список задач
+    if (e.target.id === 'category') {
+        const cat = e.target.value;
+        const taskNameSelect = document.getElementById('taskName');
+        const isFree = document.querySelector('input[name="modalTaskType"]:checked').value === 'free';
+
+        taskNameSelect.innerHTML = '<option value="">Выберите задачу...</option>';
+
+        if (window.taskCatalog && cat) {
+            const tasks = window.taskCatalog.filter(item => 
+                item.category === cat && item.is_paid === !isFree
+            );
+
+            tasks.forEach(task => {
+                const opt = document.createElement('option');
+                opt.value = task.task_name;
+                opt.textContent = task.task_name;
+                opt.setAttribute('data-duration', task.default_duration);
+                opt.setAttribute('data-price', task.default_price);
+                taskNameSelect.appendChild(opt);
+            });
+        }
+    }
 });
 
 document.getElementById('category')?.addEventListener('change', () => updateFreeSlots());
@@ -349,78 +444,81 @@ document.getElementById('changeLogBlock').classList.remove('d-none');
 document.getElementById('changeLogBlock').classList.add('d-none');
 
 // ЛОГИКА МОДАЛЬНОГО ОКНА (ВОССТАНОВЛЕНО)
-document.addEventListener('change', (e) => {
+document.addEventListener('change', async (e) => {
+    // 1. ЛОГИКА ПЕРЕКЛЮЧЕНИЯ ТИПА ЗАДАЧИ (БЕСПЛАТНО / ПЛАТНО)
     if (e.target.name === 'modalTaskType') {
         const isFree = e.target.value === 'free';
         const dateTimeBlock = document.getElementById('dateTimeBlock');
         const priceBlock = document.getElementById('priceBlock');
-        const commentBlock = document.getElementById('commentBlock'); // Новая переменная
+        const commentBlock = document.getElementById('commentBlock');
         const categorySelect = document.getElementById('category');
         const taskNameSelect = document.getElementById('taskName');
         
+        // Сброс выбора задач
         taskNameSelect.innerHTML = '<option value="">Выберите задачу...</option>';
         
+        // Управление видимостью блоков (твоя логика)
         if (isFree) {
             dateTimeBlock?.classList.add('d-none');
             priceBlock?.classList.add('d-none');
-            commentBlock?.classList.add('d-none'); // Скрываем примечание
+            commentBlock?.classList.add('d-none'); 
             document.getElementById('price').required = false;
-            categorySelect.innerHTML = `
-                <option value="">Выберите категорию...</option>
-                <option value="1С">1С</option>
-                <option value="1С-ЭДО">1С-ЭДО</option>
-                <option value="1С-ЭПД">1С-ЭПД</option>`;
         } else {
             dateTimeBlock?.classList.remove('d-none');
             priceBlock?.classList.remove('d-none');
-            commentBlock?.classList.remove('d-none'); // Показываем примечание
+            commentBlock?.classList.remove('d-none');
             document.getElementById('price').required = true;
-            categorySelect.innerHTML = `
-                <option value="">Выберите категорию...</option>
-                <option value="Техподдержка">Техподдержка</option>
-                <option value="Внедрение">Внедрение</option>`;
+        }
+
+        // ДИНАМИЧЕСКАЯ ЗАГРУЗКА КАТЕГОРИЙ ИЗ БД
+        if (!window.taskCatalog) {
+            categorySelect.innerHTML = '<option value="">Загрузка...</option>';
+            const { data, error } = await supabase.from('task_catalog').select('*').eq('is_active', true);
+            if (!error) window.taskCatalog = data;
+        }
+
+        if (window.taskCatalog) {
+            // Фильтруем уникальные категории по признаку платности (is_paid)
+            // Платные задачи (paid) -> is_paid: true
+            // Бесплатные задачи (free) -> is_paid: false
+            const availableCategories = [...new Set(window.taskCatalog
+                .filter(item => item.is_paid === !isFree)
+                .map(item => item.category))];
+
+            categorySelect.innerHTML = '<option value="">Выберите категорию...</option>';
+            availableCategories.forEach(cat => {
+                categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
         }
     }
     
-    // Логика выбора категорий остается без изменений
+    // 2. ЛОГИКА ВЫБОРА КОНКРЕТНОЙ КАТЕГОРИИ
     if (e.target.id === 'category') {
-    const cat = e.target.value;
-    const taskNameSelect = document.getElementById('taskName');
-    
-    // Теперь задачи — это объекты { name, dur }
-    const options = {
-        '1С': [
-            { name: 'Заказ 1С (локальной)', dur: 30 },
-            { name: 'Отгрузка доп лицензии 1С', dur: 30 },
-            { name: 'Отгрузка 1С:КП Отраслевой', dur: 30 }
-        ],
-        '1С-ЭДО': [
-            { name: 'Закрепление 1С-ЭДО', dur: 30 },
-            { name: 'Закрепление 1С-ЭДО Фреш', dur: 30 }
-        ],
-        'Техподдержка': [
-            { name: 'Сервер', dur: 60 }, // Тут 1 час
-            { name: 'ПО', dur: 30 },
-            { name: 'Консультация', dur: 30 }
-        ],
-        'Внедрение': [
-            { name: 'Настройка с нуля', dur: 120 }, // Тут 2 часа
-            { name: 'Перенос', dur: 90 }           // Тут 1.5 часа
-        ]
-    };
+        const cat = e.target.value;
+        const taskNameSelect = document.getElementById('taskName');
+        const isFree = document.querySelector('input[name="modalTaskType"]:checked').value === 'free';
+        const durationInput = document.getElementById('taskDuration');
 
-    taskNameSelect.innerHTML = '<option value="">Выберите задачу...</option>';
-    // Внутри блока if (e.target.id === 'category')
-const durationInput = document.getElementById('taskDuration');
-if (durationInput) durationInput.value = '00:30'; // Сбрасываем на дефолт при смене категории
-    
-    if (options[cat]) {
-        options[cat].forEach(opt => {
-            // Записываем длительность в data-атрибут, чтобы потом легко её достать
-            taskNameSelect.innerHTML += `<option value="${opt.name}" data-duration="${opt.dur}">${opt.name}</option>`;
-        });
+        if (durationInput) durationInput.value = '00:30'; // Сброс на дефолт
+        taskNameSelect.innerHTML = '<option value="">Выберите задачу...</option>';
+        
+        if (window.taskCatalog && cat) {
+            // Фильтруем задачи из БД, которые принадлежат этой категории и типу оплаты
+            const tasks = window.taskCatalog.filter(item => 
+                item.category === cat && item.is_paid === !isFree
+            );
+
+            tasks.forEach(task => {
+                // Записываем длительность и цену в data-атрибуты для автоподстановки
+                taskNameSelect.innerHTML += `
+                    <option value="${task.task_name}" 
+                            data-duration="${task.default_duration}" 
+                            data-price="${task.default_price}">
+                        ${task.task_name}
+                    </option>`;
+            });
+        }
     }
-}
 });
 
 // Авто-подстановка времени при выборе конкретной задачи

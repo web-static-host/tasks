@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель — Технический портал</title>
+    <link rel="icon" type="image/png" href="../icon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="bg-light">
+    <div id="admin-screen" class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 px-3">
+        <h2 class="h4 mb-0">⚙️ Панель управления</h2>
+        <button onclick="location.href='../index.html'" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Назад к задачам
+        </button>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-3 col-lg-2">
+            <div class="list-group shadow-sm border-0 sticky-top" style="top: 20px;">
+                <button class="list-group-item list-group-item-action active" data-bs-toggle="pill" data-bs-target="#tab-users">
+                    👥 Сотрудники
+                </button>
+                <button class="list-group-item list-group-item-action" data-bs-toggle="pill" data-bs-target="#tab-tech-config">
+                    ⚙️ Графики технарей
+                </button>
+                <button class="list-group-item list-group-item-action" data-bs-toggle="pill" data-bs-target="#tab-services">
+                    🛠️ Каталог услуг
+                </button>
+            </div>
+        </div>
+
+        <div class="col-md-9 col-lg-10">
+            <div class="tab-content bg-white p-4 rounded-3 shadow-sm min-vh-100">
+                
+                <div class="tab-pane fade show active" id="tab-users">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
+        
+        <div class="d-flex align-items-center gap-3">
+            <select id="role-filter" class="form-select form-select-sm" style="width: 160px;" onchange="filterAdminUsers()">
+                <option value="">Все роли</option>
+                <option value="Администратор">Администратор</option>
+                <option value="Менеджер">Менеджер</option>
+                <option value="Технический специалист">Технический специалист</option>
+                <option value="Технический специалист 1С">Технический специалист 1С</option>
+                <option value="Руководитель">Руководитель</option>
+
+            </select>
+
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="hide-inactive-check" onchange="saveActiveFilterState()">
+                <label class="form-check-label small fw-bold" for="hide-inactive-check">Только активные</label>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-grow-1 justify-content-md-end" style="max-width: 400px;">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-white border-end-0 text-muted">🔍</span>
+                <input type="text" id="user-search" class="form-control border-start-0" 
+                       placeholder="Поиск" oninput="filterAdminUsers()" style="box-shadow: none; border-color: #dee2e6;">
+            </div>
+            <button class="btn btn-primary btn-sm text-nowrap" onclick="openAddUserModal()">+ Добавить</button>
+        </div>
+    </div>
+
+    <div id="admin-users-list">
+        </div>
+</div>
+
+                <div class="tab-pane fade" id="tab-tech-config">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">⚙️ Графики работы технарей</h5>
+    </div>
+    
+    <div id="admin-tech-list" class="row g-3">
+        </div>
+</div>
+
+<div class="modal fade" id="techScheduleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title">Настройка графика</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="tech-schedule-form">
+                    <input type="hidden" id="sch-user-id">
+                    
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Начало работы</label>
+                            <input type="time" id="sch-work-start" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Конец (Пн-Чт)</label>
+                            <input type="time" id="sch-work-end" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Конец (Пт)</label>
+                            <input type="time" id="sch-work-friday" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Интервал (мин)</label>
+                            <select id="sch-slot" class="form-select">
+                                <option value="15">15 мин</option>
+                                <option value="30" selected>30 мин</option>
+                                <option value="60">1 час</option>
+                            </select>
+                        </div>
+                        <div class="col-12"><hr class="my-1"></div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Обед с</label>
+                            <input type="time" id="sch-lunch-start" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Обед до</label>
+                            <input type="time" id="sch-lunch-end" class="form-control" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveTechSchedule()">Сохранить график</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="tab-pane fade" id="tab-services">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h5 class="mb-1">Каталог услуг и нормативы</h5>
+            <p class="text-muted small mb-0">Управление длительностью, ценами и категориями задач</p>
+        </div>
+        <button class="btn btn-primary btn-sm rounded-pill px-3" onclick="openCatalogModal()">
+            <i class="bi bi-plus-lg"></i> Добавить услугу
+        </button>
+    </div>
+
+    <div class="row g-2 mb-3">
+        <div class="col-md-8">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="catalogSearch" class="form-control border-start-0 ps-0" placeholder="Поиск услуги или категории..." oninput="renderCatalog()">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <select id="filterPaid" class="form-select form-select-sm" onchange="renderCatalog()">
+                <option value="all">Все типы</option>
+                <option value="paid">Платные</option>
+                <option value="free">Бесплатные</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Категория</th>
+                        <th>Название</th>
+                        <th>Время</th>
+                        <th>Цена</th>
+                        <th>Статус</th>
+                        <th class="text-end pe-3">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="catalogTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="catalogModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold" id="catalogModalLabel">Параметры услуги</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="catalogForm">
+                    <input type="hidden" id="cat-id">
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Категория</label>
+                        <input type="text" id="cat-category" class="form-control form-control-sm" required list="categoryList" placeholder="Например: Облако">
+                        <datalist id="categoryList"></datalist>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Название услуги</label>
+                        <input type="text" id="cat-name" class="form-control form-control-sm" required placeholder="Например: Обновление базы">
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Время (минуты)</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" id="cat-duration" class="form-control" value="30" step="15">
+                                <span class="input-group-text">мин</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Цена (₽)</label>
+                            <input type="number" id="cat-price" class="form-control form-control-sm" value="0">
+                        </div>
+                    </div>
+
+                    <div class="bg-light p-3 rounded-3">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="cat-is-paid" checked>
+                            <label class="form-check-label small">Платная услуга (попадает в график)</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="cat-is-active" checked>
+                            <label class="form-check-label small">Активна (доступна для выбора)</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light btn-sm px-4" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary btn-sm px-4" onclick="saveCatalogItem()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userModalTitle">Сотрудник</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="user-form">
+                    <input type="hidden" id="edit-user-id">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">ФИО полностью</label>
+                        <input type="text" id="user-fullname-input" class="form-control" placeholder="Иванов Иван Иванович" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Email (Логин)</label>
+                        <input type="email" id="user-email" class="form-control" placeholder="ivanov@mail.ru" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Пароль</label>
+                        <div class="input-group">
+                            <input type="text" id="user-password" class="form-control" placeholder="Минимум 8 символов">
+                            <button class="btn btn-outline-secondary" type="button" onclick="generatePassword()">🎲</button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Отдел</label>
+                        <select id="user-dept-select" class="form-select" required>
+                            <option value="">Загрузка отделов...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Роли в системе</label>
+                        <div id="roles-checkboxes" class="p-2 border rounded bg-light" style="max-height: 120px; overflow-y: auto;">
+                            </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveUser()" id="save-user-btn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editUserModalTitle">Редактировать сотрудника</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-user-form">
+                    <input type="hidden" id="edit-user-id-hidden">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">ФИО полностью</label>
+                        <input type="text" id="edit-user-fullname" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Email (Логин)</label>
+                        <input type="email" id="edit-user-email" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Пароль</label>
+                        <div class="input-group">
+                            <input type="password" id="edit-user-password" class="form-control" placeholder="••••••••" readonly>
+                            <button class="btn btn-outline-secondary" type="button" onclick="openPasswordChangeMiniModal()" title="Изменить пароль">✏️</button>
+                            <button class="btn btn-outline-primary" type="button" onclick="copyEditAuthData()" title="Копировать Логин/Пароль">📋</button>
+                        </div>
+                        <small id="edit-pass-status" class="text-warning d-none">Пароль изменен! Не забудьте сохранить.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Отдел</label>
+                        <select id="edit-user-dept-select" class="form-select" required>
+                            </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Роли в системе</label>
+                        <div id="edit-roles-checkboxes" class="p-2 border rounded bg-light" style="max-height: 120px; overflow-y: auto;">
+                            </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditedUser()" id="save-edit-btn">Сохранить изменения</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header py-2">
+                <h6 class="modal-title">Новый пароль</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <input type="text" id="new-edit-password" class="form-control form-control-sm" placeholder="Сгенерировать новый пароль ->">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="generatePasswordInMiniModal()">🎲</button>
+                </div>
+                <div class="mt-2 text-center">
+                    <button class="btn btn-sm btn-secondary me-2" data-bs-dismiss="modal">Отмена</button>
+                    <button class="btn btn-sm btn-primary" onclick="confirmNewPassword()">Применить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script src="../config.js"></script>
+
+    <script src="users.js"></script>
+    <script src="admin.js"></script>
+    <script src="schedules.js"></script>
+</body>
+</html>

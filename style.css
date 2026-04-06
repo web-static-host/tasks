@@ -212,7 +212,6 @@ html, body {
     background-color: #fff;
     border-color: #0d6efd;
     box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
-    width: 280px; /* Слегка расширяется при фокусе */
 }
 
 
@@ -455,3 +454,13 @@ html, body {
     box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
 }
 
+
+.admin-gear {
+    transition: transform 0.4s ease-in-out, color 0.2s;
+    cursor: pointer;
+}
+
+.admin-gear:hover {
+    transform: rotate(90deg);
+    color: #ffc107 !important; /* Цвет при наведении (золотистый) */
+}

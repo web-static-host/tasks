@@ -1,8 +1,31 @@
-// --- 1. ИНИЦИАЛИЗАЦИЯ (с памятью и выбором первого) ---
-const firstTechInConfig = CONFIG.USERS.find(u => u.role === 'specialist')?.name || '';
-// Пытаемся взять из памяти, если там пусто — берем первого из списка
-let activeTechFilter = localStorage.getItem('activeTechFilter') || firstTechInConfig;
+// Вызывай это ПЕРВЫМ ДЕЛОМ в initApp или в самом верху initFilters
+function applySavedFiltersVisuals() {
+    const hideDone = document.getElementById('hideDone');
+    const onlyMyTasks = document.getElementById('onlyMyTasks');
+    const customDate = document.getElementById('filterCustomDate');
 
+    // Мгновенно ставим галочки из кэша
+    if (hideDone) {
+        hideDone.checked = localStorage.getItem('hideDone') === 'true';
+    }
+    if (onlyMyTasks) {
+        const isOnlyMy = localStorage.getItem('onlyMyTasks') === 'true';
+        onlyMyTasks.checked = isOnlyMy;
+        onlyMyTasksFilter = isOnlyMy; // Обновляем глобальную переменную сразу
+    }
+
+    // Ставим радиокнопки даты
+    const savedDateFilter = localStorage.getItem('dateFilter') || 'all';
+    const activeRadio = document.querySelector(`input[name="filterDate"][value="${savedDateFilter}"]`);
+    if (activeRadio) activeRadio.checked = true;
+    
+    // Если была своя дата, подставляем её
+    if (savedDateFilter === 'custom' && customDate) {
+        // Здесь можно тоже хранить значение даты в кэше, если нужно
+    }
+}
+
+let activeTechFilter = localStorage.getItem('activeTechFilter') || ''; 
 let currentTable = 'tasks'; 
 let onlyMyTasksFilter = false;
 
@@ -42,6 +65,11 @@ window.setTechFilter = (techName, btn) => {
 };
 
 function initFilters() {
+    const allUsers = CONFIG.USERS || [];
+    if (!activeTechFilter && CONFIG.USERS && CONFIG.USERS.length > 0) {
+        const firstTech = CONFIG.USERS.find(u => u.role === 'specialist');
+        if (firstTech) activeTechFilter = firstTech.name;
+    }
     const hideDone = document.getElementById('hideDone');
     const onlyMyTasks = document.getElementById('onlyMyTasks');
     const dateRadios = document.querySelectorAll('input[name="filterDate"]');
@@ -94,6 +122,8 @@ function initFilters() {
 
 
 function setupInterface() {
+    if (!currentUser) return;
+    const specialists = (CONFIG.USERS || []).filter(u => u.role === 'specialist');
     const userInfo = document.getElementById('user-info');
     const thRole = document.getElementById('th-user-role');
     const addBtn = document.getElementById('add-task-btn');
@@ -101,8 +131,18 @@ function setupInterface() {
     const techContainer = document.getElementById('tech-filters-container');
     const techFilters = document.getElementById('tech-filters');
 
+    const adminLink = document.getElementById('admin-link');
+    if (adminLink) {
+        if (currentUser.role === 'admin') {
+            adminLink.classList.remove('d-none'); // Показываем админу
+            adminLink.href = 'admin/admin.html'; // Укажи правильный путь к файлу админки
+        } else {
+            adminLink.classList.add('d-none'); // Скрываем от остальных
+        }
+    }
+
     if (userInfo) {
-        userInfo.innerText = `${currentUser.name} (${currentUser.role === 'manager' ? 'Менеджер' : 'Технарь'})`;
+    userInfo.innerText = currentUser.name;
     }
 
     // --- КНОПКИ ДЕЙСТВИЙ ---
@@ -134,21 +174,23 @@ if (onlyMyTasksContainer) {
 
     // --- ФИЛЬТРЫ ТЕХНАРЕЙ (для всех ролей) ---
     if (techContainer && techFilters) {
-        techContainer.classList.remove('d-none'); // Показываем всем
-        techFilters.innerHTML = ''; // Очищаем
+        techContainer.classList.remove('d-none');
+        techFilters.innerHTML = ''; 
 
+        // Берем технарей из уже загруженного CONFIG.USERS
+        const specialists = CONFIG.USERS.filter(u => u.role === 'specialist');
+        
+        specialists.forEach(tech => {
+            // Если технарь зашел сам, и фильтр еще не выбран — выбираем его
+            if (tech.name === currentUser.name && !activeTechFilter) {
+                activeTechFilter = tech.name;
+            }
 
-        // Рендерим список технарей из конфига
-        CONFIG.USERS.filter(u => u.role === 'specialist').forEach(tech => {
-            // Если технарь зашел под собой, кнопка с его именем будет активна по умолчанию
-            const isMe = (tech.name === currentUser.name && activeTechFilter === 'all');
-            const isActive = tech.name === activeTechFilter || isMe;
-            
-            // Если технарь зашел первый раз, фиксируем его имя в фильтре
-            if (isMe && currentUser.role === 'specialist') activeTechFilter = tech.name;
+            const isActive = tech.name === activeTechFilter;
 
             techFilters.insertAdjacentHTML('beforeend', 
-                `<button type="button" class="btn btn-sm btn-outline-secondary ${isActive ? 'active' : ''}" onclick="setTechFilter('${tech.name}', this)">${tech.name}</button>`
+                `<button type="button" class="btn btn-sm btn-outline-secondary ${isActive ? 'active' : ''}" 
+                 onclick="setTechFilter('${tech.name}', this)">${tech.name}</button>`
             );
         });
     }
