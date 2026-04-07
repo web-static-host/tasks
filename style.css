@@ -6,6 +6,13 @@ html, body {
     background-color: #f8f9fa;
 }
 
+/* Создаем свой класс для широкого контента */
+.custom-wide-container {
+    width: 75%;        /* Занимает 95% ширины экрана */
+    max-width: 1700px; /* Но не расширяется больше этого значения */
+    margin: 0 auto;    /* Центрируем */
+}
+
 /* 1. Скелет приложения */
 #main-content {
     height: 100vh;

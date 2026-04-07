@@ -132,3 +132,24 @@ function fillSpecialistDropdown() {
         names.map(name => `<option value="${name}">${name}</option>`).join('');
 }
 
+
+
+// Функция "анти-сон" для Supabase
+function keepSupabaseAlive() {
+    // Делаем самый легкий запрос к любой таблице (например, к ролям)
+    // Просто берем 1 запись
+    const { data, error } = supabase
+        .from('roles')
+        .select('id')
+        .limit(1)
+        .then(() => {
+            console.log('Supabase: Пинг выполнен, база не спит.');
+        });
+}
+
+// Запускаем пинг раз в 5 минут (300 000 мс)
+// Этого достаточно, чтобы бесплатный тариф не "уснул"
+setInterval(keepSupabaseAlive, 300000);
+
+// Вызываем один раз сразу при загрузке
+keepSupabaseAlive();
