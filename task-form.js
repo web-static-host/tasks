@@ -172,7 +172,6 @@ document.getElementById('task-form')?.addEventListener('submit', async (e) => {
         document.getElementById('task-form').reset();
         bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
         if (typeof currentTable !== 'undefined') currentTable = targetTable;
-        loadTasks();
     } else {
         alert("Ошибка при сохранении");
     }
@@ -189,8 +188,8 @@ window.openEditTask = async (id) => {
         editTaskId = id;
 
         if (!window.taskCatalog || window.taskCatalog.length === 0) {
-    await loadTaskCatalog(); 
-}
+            await loadTaskCatalog(); 
+        }
         
         const logBlock = document.getElementById('changeLogBlock');
         if (logBlock) logBlock.classList.remove('d-none');
@@ -201,18 +200,17 @@ window.openEditTask = async (id) => {
         const typeRadio = document.querySelector(`input[name="modalTaskType"][value="${typeValue}"]`);
         if (typeRadio) typeRadio.checked = true;
 
-        // 2. СРАЗУ управляем видимостью блоков (в обход событий)
+        // 2. Управляем видимостью блоков
         const isScheduled = (typeValue === 'paid' || typeValue === 'demo');
         document.getElementById('dateTimeBlock')?.classList.toggle('d-none', !isScheduled);
         document.getElementById('priceBlock')?.classList.toggle('d-none', !isScheduled);
         document.getElementById('commentBlock')?.classList.toggle('d-none', !isScheduled);
 
-        // 3. РУЧНОЕ НАПОЛНЕНИЕ КАТЕГОРИЙ (чтобы не ждать renderCategories)
+        // 3. РУЧНОЕ НАПОЛНЕНИЕ КАТЕГОРИЙ И ЗАДАЧ
         const categorySelect = document.getElementById('category');
         const taskNameSelect = document.getElementById('taskName');
         
         if (window.taskCatalog) {
-            // Фильтруем категории именно под этот тип задачи
             const availableCategories = [...new Set(window.taskCatalog
                 .filter(item => item.task_type === typeValue)
                 .map(item => item.category))];
@@ -222,11 +220,10 @@ window.openEditTask = async (id) => {
                 const opt = document.createElement('option');
                 opt.value = cat;
                 opt.textContent = cat;
-                if (cat === task.category) opt.selected = true; // СРАЗУ ВЫБИРАЕМ
+                if (cat === task.category) opt.selected = true;
                 categorySelect.appendChild(opt);
             });
 
-            // 4. РУЧНОЕ НАПОЛНЕНИЕ ЗАДАЧ (чтобы не ждать события change на категории)
             taskNameSelect.innerHTML = '<option value="">Выберите задачу...</option>';
             const tasks = window.taskCatalog.filter(item => 
                 item.category === task.category && item.task_type === typeValue
@@ -238,12 +235,12 @@ window.openEditTask = async (id) => {
                 opt.textContent = t.task_name;
                 opt.setAttribute('data-duration', t.default_duration);
                 opt.setAttribute('data-price', t.default_price || 0);
-                if (t.task_name === task.task_name) opt.selected = true; // СРАЗУ ВЫБИРАЕМ
+                if (t.task_name === task.task_name) opt.selected = true;
                 taskNameSelect.appendChild(opt);
             });
         }
 
-        // 5. Заполняем текстовые поля
+        // 4. Заполняем текстовые поля
         document.getElementById('specialist').value = task.specialist;
         document.getElementById('inn').value = task.inn || '';
         document.getElementById('bitrix').value = task.bitrix_url || '';
@@ -256,16 +253,32 @@ window.openEditTask = async (id) => {
         const durationField = document.getElementById('taskDuration');
         if (durationField) durationField.value = `${hh}:${mm}`;
 
+        // 5. ИСПРАВЛЕНИЕ ДАТЫ И ВРЕМЕНИ (Принудительная инициализация)
         if (!isFree) {
             document.getElementById('price').value = task.price;
-            const dateField = document.getElementById('date');
-            if (dateField && dateField._flatpickr) {
-                dateField._flatpickr.setDate(task.date);
+            
+            const dateInput = document.getElementById('date');
+            
+            // Если Flatpickr еще не создан на этом элементе (первый запуск), создаем его сразу
+            if (dateInput && !dateInput._flatpickr) {
+                flatpickr(dateInput, {
+                    ...flatpickrConfig,
+                    onChange: () => { if (typeof updateFreeSlots === 'function') updateFreeSlots(); }
+                });
             }
-            // Подгружаем слоты времени
+
+            // Устанавливаем дату напрямую через API Flatpickr
+            if (dateInput && dateInput._flatpickr) {
+                dateInput._flatpickr.setDate(task.date, false); // false чтобы не триггерить лишние события
+            }
+
+            // Подгружаем слоты времени. 
+            // Используем чуть больший таймаут и передаем сохраненное время как дефолт
             if (typeof updateFreeSlots === 'function') {
-                // Маленький таймаут только для слотов, чтобы календарь прогрузился
-                setTimeout(() => updateFreeSlots(task.time), 50);
+                const savedTime = task.time ? task.time.substring(0, 5) : null;
+                setTimeout(() => {
+                    updateFreeSlots(savedTime);
+                }, 100);
             }
         }
 

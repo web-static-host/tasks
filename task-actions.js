@@ -88,10 +88,7 @@ window.updateTaskStatus = async (id, newStatus, comment = null) => {
             }
         }
 
-        // Вызываем твою функцию перерисовки таблицы
-        if (typeof loadTasks === 'function') {
-            await loadTasks(); 
-        }
+
 
     } catch (e) { 
         console.error('Критическая ошибка обновления:', e);
@@ -244,7 +241,7 @@ window.confirmReschedule = async () => {
 
             // Закрываем модалку и обновляем список
             bootstrap.Modal.getInstance(document.getElementById('rescheduleModal')).hide();
-            loadTasks();
+
         }
     } catch (e) { 
         console.error('Ошибка в confirmReschedule:', e); 
@@ -255,7 +252,6 @@ window.deleteTask = async (id) => {
     if (confirm("Удалить задачу #" + id + "?")) {
         const targetTable = (typeof currentTable !== 'undefined') ? currentTable : 'tasks';
         await supabase.from(targetTable).delete().eq('id', id);
-        loadTasks();
     }
 };
 
