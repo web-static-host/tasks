@@ -126,6 +126,22 @@ window.renderTaskRowHTML = function(t) {
     return html;
 };
 
+// Функция-обертка для вставки данных без потери позиции скролла
+function insertWithScrollPreservation(container, html, position = 'afterbegin') {
+    const oldScrollHeight = container.scrollHeight;
+    const oldScrollTop = container.scrollTop;
+
+    container.insertAdjacentHTML(position, html);
+
+    // Если вставляем в начало (прошлое), корректируем скролл
+    if (position === 'afterbegin') {
+        const heightDiff = container.scrollHeight - oldScrollHeight;
+        container.scrollTop = oldScrollTop + heightDiff;
+    }
+}
+
+// Флаг, чтобы понимать, загружена ли полная история
+let isFullHistoryLoaded = false;
 
 async function loadTasks() {
     const list = document.getElementById('task-list');
@@ -133,80 +149,188 @@ async function loadTasks() {
 
     const isPaid = currentTable === 'tasks';
     let totalCols = isPaid ? 12 : 11;
+    isFullHistoryLoaded = false;
 
-    // Управляем заголовками
+    // Считываем фильтры
+    const activeTech = typeof activeTechFilter !== 'undefined' ? activeTechFilter : 'all';
+    const dateFilter = localStorage.getItem('dateFilter') || 'all';
+
     const deptTh = document.getElementById('th-dept');
     if (deptTh) deptTh.hidden = false;
     const commentTh = document.getElementById('th-comment');
     if (commentTh) commentTh.hidden = !isPaid;
 
-    list.innerHTML = `<tr><td colspan="${totalCols}" class="text-center text-muted py-4">Загрузка данных...</td></tr>`;
+    list.innerHTML = `<tr><td colspan="${totalCols}" class="text-center text-muted py-4">Загрузка...</td></tr>`;
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const yest = new Date(now); yest.setDate(now.getDate() - 1);
+    const yesterdayStr = yest.toISOString().split('T')[0];
+    const tom = new Date(now); tom.setDate(now.getDate() + 1);
+    const tomorrowStr = tom.toISOString().split('T')[0];
 
     try {
         let query = supabase.from(currentTable).select('*');
+        
+        // ФИЛЬТР ПО ТЕХНИКУ (в запросе)
+        if (activeTech !== 'all' && activeTech !== '') {
+            query = query.eq('specialist', activeTech);
+        }
+
+        if (isPaid && dateFilter === 'all') {
+            query = query.gte('date', yesterdayStr).lte('date', tomorrowStr);
+        } else if (dateFilter === 'today') {
+            query = query.eq('date', todayStr);
+        }
+
         query = query.order('date', { ascending: true });
         if (isPaid) query = query.order('time', { ascending: true });
         else query = query.order('created_at', { ascending: false });
 
-        const { data: tasks, error } = await query;
+        const { data: quickTasks, error } = await query;
         if (error) throw error;
 
-        const hideDone = localStorage.getItem('hideDone') === 'true';
-        const dateFilter = localStorage.getItem('dateFilter') || 'all';
-        const onlyMyTasks = localStorage.getItem('onlyMyTasks') === 'true';
-        const customDateVal = document.getElementById('filterCustomDate')?.value;
-        const searchQuery = document.getElementById('taskSearch')?.value.toLowerCase() || '';
-        
-        const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
-        const tomDate = new Date(now);
-        tomDate.setDate(now.getDate() + 1);
-        const tomorrowStr = tomDate.toISOString().split('T')[0];
+        renderTaskList(quickTasks, true); 
 
-        let filteredTasks = tasks.filter(t => {
-            if (hideDone && t.status === 'Выполнено') return false;
-            if (onlyMyTasks && currentUser.role === 'manager' && t.manager !== currentUser.name) return false;
-            if (activeTechFilter !== 'all' && t.specialist !== activeTechFilter) return false;
-            
-            let dateMatch = true;
-            if (isPaid) {
-                if (dateFilter === 'today') dateMatch = (t.date === todayStr);
-                else if (dateFilter === 'tomorrow') dateMatch = (t.date === tomorrowStr);
-                else if (dateFilter === 'custom' && customDateVal) dateMatch = (t.date === customDateVal);
-            }
-            if (!dateMatch) return false;
+        if (isPaid && dateFilter === 'all') {
+            loadRemainingTasks(yesterdayStr, tomorrowStr);
+        }
 
-            if (searchQuery) {
-                const searchString = [t.id, t.task_name, t.specialist, t.manager, t.inn, t.status, t.price].join(' ').toLowerCase();
-                if (!searchString.includes(searchQuery)) return false;
-            }
-            return true;
-        });
+    } catch (e) { 
+        console.error(e); 
+        list.innerHTML = `<tr><td colspan="${totalCols}" class="text-center text-danger">Ошибка загрузки</td></tr>`;
+    }
+}
 
-        list.innerHTML = filteredTasks.length ? '' : `<tr><td colspan="${totalCols}" class="text-center py-4">Ничего не найдено</td></tr>`;
+// Функция для отрисовки (вынесена из loadTasks)
+function renderTaskList(tasks, isFirstStep = false) {
+    const list = document.getElementById('task-list');
+    const container = document.querySelector('.table-responsive');
+    const todayStr = new Date().toISOString().split('T')[0];
+    const totalCols = currentTable === 'tasks' ? 12 : 11;
 
+    tasks.sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        return (a.time || '').localeCompare(b.time || '');
+    });
+
+    if (isFirstStep) {
+        list.innerHTML = '';
         let lastDate = null;
-        filteredTasks.forEach(t => {
+        tasks.forEach(t => {
             const taskDate = t.date || (t.created_at ? t.created_at.split('T')[0] : '');
-
-            // Отрисовка разделителя дат
-            if (lastDate && taskDate !== lastDate) {
-                list.insertAdjacentHTML('beforeend', `
-                    <tr class="day-divider day-header" data-date="${taskDate}">
-                        <td colspan="${totalCols}" class="bg-light fw-bold py-2 px-3 border-bottom">
-                            ${new Date(taskDate).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
-                            ${taskDate === todayStr ? '<span class="badge bg-primary ms-2">Сегодня</span>' : ''}
-                        </td>
-                    </tr>`);
+            if (taskDate !== lastDate) {
+                list.insertAdjacentHTML('beforeend', renderDayHeader(taskDate, todayStr, totalCols));
+                lastDate = taskDate;
             }
-            lastDate = taskDate;
-
-            // ВСТАВКА СТРОКИ ЧЕРЕЗ ОБЩУЮ ФУНКЦИЮ
             list.insertAdjacentHTML('beforeend', window.renderTaskRowHTML(t));
         });
+        
+        // После первой отрисовки (3 дня) скроллим к сегодня, если нужно
+        // scrollToToday(); 
+    } else {
+        const existingHeaders = list.querySelectorAll('.day-header');
+        const minDate = existingHeaders.length ? existingHeaders[0].getAttribute('data-date') : todayStr;
 
-        setTimeout(scrollToToday, 100);
-    } catch (e) { console.error(e); }
+        const pastTasks = tasks.filter(t => t.date < minDate);
+
+        if (pastTasks.length > 0) {
+            // 1. Находим "якорь" — первый видимый заголовок ДО вставки
+            const anchorElement = list.querySelector('.day-header');
+            if (!anchorElement) return; // Если таблицы еще нет, просто выходим
+
+            // 2. Запоминаем его точное положение относительно верхней границы контейнера
+            const rectBefore = anchorElement.offsetTop;
+            const scrollBefore = container.scrollTop;
+
+            // 3. Собираем HTML "прошлого"
+            let pastHtml = '';
+            let lastDate = null;
+            pastTasks.forEach(t => {
+                if (t.date !== lastDate) {
+                    pastHtml += renderDayHeader(t.date, todayStr, totalCols);
+                    lastDate = t.date;
+                }
+                pastHtml += window.renderTaskRowHTML(t);
+            });
+
+            // 4. Вставляем данные
+            list.insertAdjacentHTML('afterbegin', pastHtml);
+
+            // 5. Корректируем скролл. 
+            // Используем offsetTop нового положения якоря для компенсации разницы.
+            const rectAfter = anchorElement.offsetTop;
+            const diff = rectAfter - rectBefore;
+
+            // Мгновенная коррекция
+            container.style.scrollBehavior = 'auto'; // Отключаем плавность на миг
+            container.scrollTop = scrollBefore + diff;
+            
+            // Дополнительная проверка через один кадр (на случай тяжелого рендеринга)
+            requestAnimationFrame(() => {
+                container.scrollTop = scrollBefore + diff;
+                container.style.scrollBehavior = 'smooth'; // Возвращаем плавность
+            });
+        }
+
+        // Будущее догружаем просто так
+        const maxDate = existingHeaders.length ? existingHeaders[existingHeaders.length - 1].getAttribute('data-date') : todayStr;
+        const futureTasks = tasks.filter(t => t.date > maxDate);
+        if (futureTasks.length > 0) {
+            let futureHtml = '';
+            let lastDate = null;
+            futureTasks.forEach(t => {
+                if (t.date !== lastDate) {
+                    futureHtml += renderDayHeader(t.date, todayStr, totalCols);
+                    lastDate = t.date;
+                }
+                futureHtml += window.renderTaskRowHTML(t);
+            });
+            list.insertAdjacentHTML('beforeend', futureHtml);
+        }
+    }
+}
+
+// Вспомогательная для заголовка
+function renderDayHeader(date, todayStr, cols) {
+    return `
+        <tr class="day-divider day-header" data-date="${date}">
+            <td colspan="${cols}" class="bg-light fw-bold py-2 px-3 border-bottom">
+                ${new Date(date).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
+                ${date === todayStr ? '<span class="badge bg-primary ms-2">Сегодня</span>' : ''}
+            </td>
+        </tr>`;
+}
+
+// Фоновая загрузка остального
+async function loadRemainingTasks(exclStart, exclEnd) {
+    try {
+        const activeTech = typeof activeTechFilter !== 'undefined' ? activeTechFilter : 'all';
+        
+        let query = supabase.from(currentTable).select('*');
+
+        // Добавляем фильтр по технарю, если он выбран
+        if (activeTech !== 'all' && activeTech !== '') {
+            query = query.eq('specialist', activeTech);
+        }
+
+        // Исключаем уже загруженные 3 дня
+        query = query.or(`date.lt.${exclStart},date.gt.${exclEnd}`);
+
+        const { data: allTasks } = await query
+            .order('date', { ascending: true })
+            .order('time', { ascending: true });
+
+        if (allTasks) {
+            renderTaskList(allTasks, false);
+            isFullHistoryLoaded = true;
+            console.log("✅ Остальные данные догружены в фоне");
+        }
+    } catch (e) {
+        console.error("Ошибка фоновой загрузки:", e);
+    }
 }
 
 

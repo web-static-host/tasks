@@ -379,7 +379,6 @@ document.getElementById('taskModal')?.addEventListener('shown.bs.modal', async (
 document.addEventListener('change', (e) => {
     // Если переключили Платная/Бесплатная — перерисовываем категории
     if (e.target.name === 'modalTaskType') {
-        renderCategories();
         
         // Скрываем/показываем блоки (твоя логика)
         const isFree = e.target.value === 'free';

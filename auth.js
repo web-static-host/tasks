@@ -74,17 +74,6 @@ function showMainContent() {
     if (typeof loadTasks === 'function') loadTasks();
 }
 
-// Проверка инициализации Supabase
-if (typeof supabase === 'undefined') {
-    var supabase; 
-}
-
-try {
-    supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
-    console.log("✅ Supabase доступен");
-} catch (err) {
-    console.error("❌ Ошибка инициализации:", err);
-}
 
 // 1. АВТОРИЗАЦИЯ И ИНИЦИАЛИЗАЦИЯ
 

@@ -56,8 +56,9 @@ html, body {
 
 /* 4. Зона скролла */
 .table-responsive {
+    
     height: 700px; /* Жесткая высота блока */
-    overflow-y: auto !important; /* Включаем вертикальный скролл */
+    overflow-y: scroll !important; /* Включаем вертикальный скролл */
     border: 1px solid #dee2e6; /* Тонкая рамка вокруг */
     background: #fff;
 }
@@ -289,10 +290,16 @@ html, body {
     word-break: break-word !important;
 }
 
+.text-primary {
+    white-space: nowrap !important;
+    width: 30px
+}
+
 /* Запрещаем перенос ТОЛЬКО дате и цене (чтобы не рвались цифры) */
 .cell-datetime, 
 .cell-price {
     white-space: nowrap !important;
+    width: 120px
 }
 
 /* Фиксируем ширину примечания, чтобы оно не раздувало таблицу */
@@ -471,4 +478,8 @@ html, body {
 .admin-gear:hover {
     transform: rotate(90deg);
     color: #ffc107 !important; /* Цвет при наведении (золотистый) */
+}
+
+.table-responsive {
+    overflow-anchor: none !important;
 }

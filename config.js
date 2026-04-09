@@ -1,13 +1,9 @@
+
 const CONFIG = {
     SUPABASE_URL: 'https://zvgtqjivmereyxiodkub.supabase.co',
     SUPABASE_KEY: 'sb_publishable_KRIlHh6op0I-JuNSsRLQQQ_2XSzICXq',
     
     USERS: [],
-    // USERS: [
-    //     { id: 1, name: "Менеджер Иванович", role: "manager", dept: "Отдел продаж" },
-    //     { id: 2, name: "Свиридкин А.В.", role: "specialist", dept: "Тех. отдел" },
-    //     { id: 3, name: "Мурадов Р.А.", role: "specialist", dept: "Тех. отдел" }
-    // ],
     SPECIALISTS: {},
 
     // Оставляем для обратной связи, если где-то используется напрямую
@@ -19,7 +15,8 @@ const CONFIG = {
     
 
 };
-
+window.supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+var supabase = window.supabase;
 
 // Загружаем только тех, кто может быть исполнителем (Специалисты)
 async function syncUsersWithLoginList() {
@@ -143,6 +140,7 @@ function keepSupabaseAlive() {
         .select('id')
         .limit(1)
         .then(() => {
+            if (error) console.error('Пинг не удался:', error);
             console.log('Supabase: Пинг выполнен, база не спит.');
         });
 }
