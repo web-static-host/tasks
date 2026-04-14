@@ -51,9 +51,11 @@ window.updateTaskStatus = async (id, newStatus, comment = null) => {
         // 3. Готовим данные для обновления
         const updateData = { status: newStatus };
 
-        // Если статус "завершающий", обнуляем длительность
+        // Если статус "завершающий", обнуляем длительность (ТОЛЬКО ДЛЯ ПЛАТНЫХ)
         const freeTimeStatuses = ['Выполнено', 'Возврат', 'Ожидание от клиента', 'Ожидание от менеджера', 'Ожидание от тех.спеца', 'Не отвечает'];
-        if (freeTimeStatuses.includes(newStatus)) {
+        
+        // ДОБАВИЛИ ПРОВЕРКУ: && targetTable !== 'free_tasks'
+        if (freeTimeStatuses.includes(newStatus) && targetTable !== 'free_tasks') {
             updateData.duration = 0;
         }
 
@@ -268,11 +270,8 @@ window.copyTask = async (id) => {
         editTaskId = null;
 
         const isFree = targetTable === 'free_tasks';
-        const typeRadio = document.getElementById(isFree ? 'modalTypeFree' : 'modalTypePaid');
-        if (typeRadio) {
-            typeRadio.checked = true;
-            typeRadio.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+        const typeValue = isFree ? 'free' : (task.task_type || 'paid');
+        openDynamicModal(typeValue, false);
 
         setTimeout(async () => {
             // Заполняем поля из старой задачи
@@ -317,6 +316,103 @@ window.copyTask = async (id) => {
     } catch (e) { 
         console.error(e);
         alert("Ошибка при копировании"); 
+    }
+};
+
+window.openEditTask = async (id) => {
+    try {
+        // Страховка: если каталог задач не загрузился, грузим его принудительно
+        if (!window.taskCatalog && typeof loadTaskCatalog === 'function') {
+            await loadTaskCatalog();
+        }
+
+        const targetTable = (typeof currentTable !== 'undefined') ? currentTable : 'tasks';
+        const { data: task, error } = await supabase.from(targetTable).select('*').eq('id', id).single();
+        
+        if (error) throw error;
+
+        editMode = true;
+        editTaskId = id;
+
+        // 1. Определяем тип модалки: Платная, Бесплатная или Демо
+        let modalType = 'paid';
+        if (targetTable === 'free_tasks') {
+            modalType = 'free';
+        } else if (task.category === 'Демонстрация') {
+            modalType = 'demo';
+        }
+
+        // 2. Открываем нужную модалку в режиме редактирования (isEdit = true)
+        openDynamicModal(modalType, true);
+
+        // 3. Ждем, пока DOM модалки отрисуется
+        setTimeout(async () => {
+            // Подставляем категорию (для платных задач)
+            const catSelect = document.getElementById('category');
+            if (catSelect && catSelect.tagName === 'SELECT' && task.category) {
+                catSelect.value = task.category;
+                catSelect.dispatchEvent(new Event('change', { bubbles: true })); 
+            }
+
+            // Ждем, пока отработает событие change и сформируются списки задач (taskName)
+            setTimeout(async () => {
+                const taskSelect = document.getElementById('taskName');
+                if (taskSelect) taskSelect.value = task.task_name;
+
+                const specSelect = document.getElementById('specialist');
+                if (specSelect) specSelect.value = task.specialist || '';
+
+                const innInput = document.getElementById('inn');
+                if (innInput) innInput.value = task.inn || '';
+
+                const bitrixInput = document.getElementById('bitrix');
+                if (bitrixInput) bitrixInput.value = task.bitrix_url || '';
+
+                const priceInput = document.getElementById('price');
+                if (priceInput) priceInput.value = task.price || 0;
+
+                const commentInput = document.getElementById('taskComment');
+                if (commentInput) commentInput.value = task.comment || '';
+
+                // Восстанавливаем длительность
+                const durationField = document.getElementById('taskDuration');
+                if (durationField) {
+                    const dbDuration = task.duration || 30;
+                    const hours = Math.floor(dbDuration / 60);
+                    const minutes = dbDuration % 60;
+                    durationField.value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                }
+
+                // Дата и время (только для платных и демо)
+                if (modalType !== 'free') {
+                    const dateField = document.getElementById('date');
+                    if (dateField && dateField._flatpickr) {
+                        dateField._flatpickr.setDate(task.date);
+                    }
+                    
+                    // Загружаем свободные слоты и подставляем время из задачи
+                    if (typeof updateFreeSlots === 'function') {
+                        await updateFreeSlots(task.time);
+                    }
+                }
+
+                // Показываем блок с причиной изменения (для истории)
+                const logBlock = document.getElementById('changeLogBlock');
+                if (logBlock) logBlock.classList.remove('d-none');
+
+                const submitBtn = document.getElementById('submit-btn');
+                if (submitBtn) submitBtn.innerText = "Сохранить изменения";
+
+                // Наконец, показываем саму модалку
+                new bootstrap.Modal(document.getElementById('taskModal')).show();
+
+            }, 50); // Пауза для формирования select с задачами
+
+        }, 50); // Пауза для рендера HTML модалки
+
+    } catch (e) {
+        console.error('Ошибка при открытии редактирования:', e);
+        alert("Ошибка при загрузке данных задачи");
     }
 };
 

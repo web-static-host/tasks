@@ -124,9 +124,16 @@
     + Занять время
 </button>
 
-                            <button id="add-task-btn" type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#taskModal">
-                                + Новая задача
-                            </button>
+                            <div class="dropdown d-inline-block" id="add-task-btn-container">
+    <button id="add-task-btn" class="btn btn-primary shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+        + Новая задача
+    </button>
+    <ul class="dropdown-menu shadow">
+        <li><a class="dropdown-item fw-bold text-success" href="#" onclick="openDynamicModal('paid')">💰 Платная задача</a></li>
+        <li><a class="dropdown-item fw-bold text-primary" href="#" onclick="openDynamicModal('free')">🆓 Бесплатная задача</a></li>
+        <li><a class="dropdown-item fw-bold text-info" href="#" onclick="openDynamicModal('demo')">📺 Демонстрация</a></li>
+    </ul>
+</div>
                         </div>
                     </div>
                 </div>
@@ -157,101 +164,6 @@
             </div>
         </div>
     </div>
-
-
-    
-<div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg"> <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header py-2">
-                <h5 class="modal-title">Постановка задачи</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body pt-0">
-                <form id="task-form">
-                    <div class="py-2 mb-2 bg-light rounded border d-flex justify-content-center">
-                        <div class="btn-group w-75" role="group">
-                            <input type="radio" class="btn-check" name="modalTaskType" id="modalTypePaid" value="paid" checked>
-                            <label class="btn btn-sm btn-outline-primary" for="modalTypePaid">Платная</label>
-                            
-                            <input type="radio" class="btn-check" name="modalTaskType" id="modalTypeFree" value="free">
-                            <label class="btn btn-sm btn-outline-primary" for="modalTypeFree">Бесплатная</label>
-
-                            <input type="radio" class="btn-check" name="modalTaskType" id="type-demo" value="demo">
-                            <label class="btn btn-sm btn-outline-primary" for="type-demo">Демо</label>
-                        </div>
-                    </div>
-                    
-
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="step mb-2">
-                                <label class="form-label fw-bold mb-1 small">1. Тип работы и исполнитель</label>
-                                <select id="category" class="form-select form-select-sm mb-2" required>
-                                    <option value="">Выберите категорию...</option>
-                                </select>
-                                <select id="taskName" class="form-select form-select-sm mb-2" required>
-                                    <option value="">Выберите задачу...</option>
-                                </select>
-                                <select id="specialist" class="form-select form-select-sm" required>
-                                    <option value="">Выберите специалиста...</option>
-                                </select>
-                            </div>
-
-                            <div class="step mb-2">
-                                <label class="form-label fw-bold mb-1 small">2. Клиент и оплата</label>
-                                <input type="text" id="inn" class="form-control form-control-sm mb-2" placeholder="ИНН клиента" required>
-                                <input type="url" id="bitrix" class="form-control form-control-sm mb-2" placeholder="Ссылка на Битрикс24" required>
-                                <div id="priceBlock" class="input-group input-group-sm">
-                                    <span class="input-group-text">₽</span>
-                                    <input type="number" id="price" class="form-control" placeholder="Стоимость" required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div id="dateTimeBlock" class="step mb-2">
-    <div class="row g-2">
-        <div class="col-4">
-            <label class="form-label fw-bold mb-1 small">Дата</label>
-            <input type="text" id="date" class="form-control" placeholder="00.00.0000">
-        </div>
-        <div class="col-4">
-            <label class="form-label fw-bold mb-1 small">Время</label>
-            <select id="time" class="form-select" disabled>
-                <option value="">--:--</option>
-            </select>
-        </div>
-        <div class="col-4">
-            <label class="form-label fw-bold mb-1 small">Длительность</label>
-            <input type="time" id="taskDuration" class="form-control" 
-                   value="00:30" min="00:30" step="1800">
-        </div>
-    </div>
-
-    <div id="commentBlock" class="mt-2">
-        <label class="form-label fw-bold mb-1 small">Примечание</label>
-        <textarea class="form-control form-control-sm" id="taskComment" rows="2" maxlength="55"
-                   placeholder='Например: "Клиент на месте до 14:00", "Можно раньше" или "Можно в любое время"'></textarea>
-    </div>
-</div>
-                        </div>
-                    </div>
-
-                    <div id="changeLogBlock" class="mt-2 p-2 bg-warning bg-opacity-10 border rounded d-none">
-                        <label class="form-label fw-bold small mb-1 text-danger">Причина изменения (в историю)</label>
-                        <textarea class="form-control form-control-sm" id="historyComment" rows="1" 
-                                  placeholder="Например: Перенос по просьбе клиента"></textarea>
-                    </div>
-                    
-
-                    <div class="mt-3">
-                        <button type="submit" class="btn btn-success w-100 py-2 shadow-sm" id="submit-btn">Сохранить</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 
 
     <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true">
@@ -334,7 +246,7 @@
     </div>
 </div>
 
-
+    <div id="dynamic-modal-container"></div>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
@@ -365,5 +277,8 @@
 
     <!-- Занятие времени тех спецом /отпуск /больничный /встреча -->
     <script src="tech-busy.js"></script>
+
+    <!-- Модалки создания задач -->
+    <script src="modals.js"></script>
 </body>
 </html>

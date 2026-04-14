@@ -1,0 +1,185 @@
+/* 1. Глобальные настройки контейнера */
+.catalog-half-width {
+    max-width: 600px;
+    width: 100%;
+}
+
+/* 2. Категории (Гармошка) - убираем синеву и дефолтные стили */
+.custom-acc-btn {
+    background: #f8f9fa !important;
+    color: #333 !important;
+    box-shadow: none !important;
+    border: 1px solid #eee !important;
+    border-radius: 8px !important;
+    padding: 10px 15px !important;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.custom-acc-btn:not(.collapsed) {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    background: #f1f3f5 !important;
+}
+
+/* 3. Строка-карточка услуги */
+.service-row-card {
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 1px solid #efefef;
+    border-radius: 6px;
+    margin-bottom: 3px; /* Оптимальная плотность */
+    padding: 6px 16px;
+    transition: all 0.2s ease;
+}
+
+.service-row-card:hover {
+    border-color: #d1d1d1;
+    background: #fafafa;
+}
+
+/* Состояние заблокированной услуги */
+.service-row-card.blocked {
+    background: #fcfcfc;
+    opacity: 0.5;
+    filter: grayscale(0.5);
+}
+
+/* 4. Внутренние элементы строки */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.dot-active { 
+    background: #28a745; 
+    box-shadow: 0 0 5px rgba(40,167,69,0.3); 
+}
+
+.dot-blocked { 
+    background: #adb5bd; 
+}
+
+.service-name {
+    flex-grow: 1;
+    font-size: 0.9rem;
+    color: #212529;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 10px;
+}
+
+/* 5. Блок управления (Время + Кнопки) */
+.service-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Расстояние между временем и иконками */
+    flex-shrink: 0;
+}
+
+.service-time {
+    font-size: 0.8rem;
+    color: #6c757d;
+    min-width: 50px;
+    text-align: right;
+    font-variant-numeric: tabular-nums; /* Чтобы цифры не прыгали */
+}
+
+/* Стили для кнопок-иконок */
+.btn-icon-sm {
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    transition: opacity 0.2s;
+    text-decoration: none !important;
+}
+
+.btn-icon-sm:hover {
+    opacity: 0.7;
+}
+
+/* Убираем синий контур при клике на иконки */
+.btn-icon-sm:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Современные табы (Pills) */
+.catalog-pills .nav-link {
+    border-radius: 50rem;
+    color: #6c757d;
+    font-weight: 600;
+    padding: 8px 20px;
+    margin-right: 10px;
+    transition: all 0.2s ease;
+}
+.catalog-pills .nav-link:hover {
+    background-color: #f1f3f5;
+}
+.catalog-pills .nav-link.active {
+    background-color: #212529;
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* Блок категории в стиле Notion */
+.category-block {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    overflow: hidden;
+    margin-bottom: 16px;
+    transition: all 0.2s ease;
+}
+.category-block:hover {
+    border-color: #dee2e6;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+.category-header {
+    background: #fdfdfd;
+    border-bottom: 1px solid #f1f3f5;
+    padding: 12px 16px;
+}
+
+/* Кнопки "Добавить" в стиле Trello */
+.add-task-row {
+    color: #868e96;
+    transition: background-color 0.2s, color 0.2s;
+    user-select: none;
+}
+.add-task-row:hover {
+    background-color: #f8f9fa;
+    color: #0d6efd !important;
+}
+
+.add-category-row {
+    border-style: dashed !important;
+    border-color: #ced4da !important;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+.add-category-row:hover {
+    background-color: #f8f9fa;
+    border-color: #0d6efd !important;
+    color: #0d6efd !important;
+}
+
+/* Иконка плюсика в шапке */
+.add-cat-btn svg {
+    transition: transform 0.2s;
+}
+.add-cat-btn:hover svg {
+    transform: scale(1.15);
+}

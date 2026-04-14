@@ -178,7 +178,7 @@ async function loadTasks() {
         }
 
         if (isPaid && dateFilter === 'all') {
-            query = query.gte('date', yesterdayStr).lte('date', tomorrowStr);
+            query = query.gte('date', todayStr).lte('date', tomorrowStr);
         } else if (dateFilter === 'today') {
             query = query.eq('date', todayStr);
         }
@@ -193,7 +193,7 @@ async function loadTasks() {
         renderTaskList(quickTasks, true); 
 
         if (isPaid && dateFilter === 'all') {
-            loadRemainingTasks(yesterdayStr, tomorrowStr);
+            loadRemainingTasks(todayStr, tomorrowStr);
         }
 
     } catch (e) { 
@@ -208,6 +208,11 @@ function renderTaskList(tasks, isFirstStep = false) {
     const container = document.querySelector('.table-responsive');
     const todayStr = new Date().toISOString().split('T')[0];
     const totalCols = currentTable === 'tasks' ? 12 : 11;
+
+    const hasToday = tasks.some(t => (t.date || (t.created_at ? t.created_at.split('T')[0] : '')) === todayStr);
+    if (isFirstStep && !hasToday) {
+        tasks.push({ date: todayStr, isEmptyPlaceholder: true });
+    }
 
     tasks.sort((a, b) => {
         const dateA = a.date || '';
@@ -225,11 +230,26 @@ function renderTaskList(tasks, isFirstStep = false) {
                 list.insertAdjacentHTML('beforeend', renderDayHeader(taskDate, todayStr, totalCols));
                 lastDate = taskDate;
             }
-            list.insertAdjacentHTML('beforeend', window.renderTaskRowHTML(t));
+
+            // 2. Если это пустышка — выводим надпись, иначе — обычную строку
+            if (t.isEmptyPlaceholder) {
+                list.insertAdjacentHTML('beforeend', `
+                    <tr class="empty-row-placeholder">
+                        <td colspan="${totalCols}" class="text-center text-muted py-4">
+                            <small>Пока задач нет</small>
+                        </td>
+                    </tr>
+                `);
+            } else {
+                list.insertAdjacentHTML('beforeend', window.renderTaskRowHTML(t));
+            }
         });
         
         // После первой отрисовки (3 дня) скроллим к сегодня, если нужно
-        // scrollToToday(); 
+        setTimeout(() => {
+            if (typeof scrollToToday === 'function') scrollToToday();
+        }, 100);
+
     } else {
         const existingHeaders = list.querySelectorAll('.day-header');
         const minDate = existingHeaders.length ? existingHeaders[0].getAttribute('data-date') : todayStr;
@@ -336,30 +356,54 @@ async function loadRemainingTasks(exclStart, exclEnd) {
 
 function scrollToToday() {
     const container = document.querySelector('.table-responsive');
+    const table = container ? container.querySelector('table') : null;
     const dayHeaders = document.querySelectorAll('.day-header');
-    const tableHeader = document.querySelector('thead'); // Находим саму шапку
     const todayStr = new Date().toISOString().split('T')[0];
     
     let targetRow = null;
-
-    // Ищем сегодня или ближайший будущий день
     for (let header of dayHeaders) {
-        const headerDate = header.getAttribute('data-date');
-        if (headerDate >= todayStr) {
+        if (header.getAttribute('data-date') >= todayStr) {
             targetRow = header;
             break; 
         }
     }
 
-    if (targetRow && container) {
-        // Вычисляем высоту липкой шапки (обычно ~40-50px)
-        const headerHeight = tableHeader ? tableHeader.offsetHeight : 0;
+    if (targetRow && container && table) {
+        // 1. Ищем или создаем невидимую распорку
+        let spacer = container.querySelector('#scroll-spacer');
+        if (!spacer) {
+            spacer = document.createElement('div');
+            spacer.id = 'scroll-spacer';
+            container.appendChild(spacer);
+        }
+        // Сбрасываем высоту
+        spacer.style.height = '0px'; 
+
+        // 2. Учитываем высоту шапки
+        const thead = table.querySelector('thead');
+        const headerHeight = thead ? thead.offsetHeight : 0;
         
-        // Позиция строки МИНУС высота шапки
-        const rowPos = targetRow.offsetTop - headerHeight;
+        // Целевая позиция скролла
+        const targetScrollPos = targetRow.offsetTop - headerHeight;
+
+        // 3. Вычисляем геометрию
+        const containerHeight = container.clientHeight;
+        const currentTableHeight = table.offsetHeight; 
         
+        const requiredHeight = targetScrollPos + containerHeight;
+
+        // 4. Добавляем ровно столько, сколько нужно, без запасов
+        if (requiredHeight > currentTableHeight) {
+            const extraSpace = requiredHeight - currentTableHeight;
+            // Округляем в большую сторону, чтобы избежать проблем с дробными пикселями у разных мониторов
+            spacer.style.height = Math.ceil(extraSpace) + 'px'; 
+        } else {
+            spacer.style.height = '0px';
+        }
+
+        // 5. Крутим
         container.scrollTo({
-            top: rowPos,
+            top: targetScrollPos,
             behavior: 'smooth'
         });
     }
@@ -451,25 +495,34 @@ if (key === 'duration') {
 };
 
 // ПОДПИСКА НА ОБНОВЛЕНИЯ В РЕАЛЬНОМ ВРЕМЕНИ
-// ОБНОВЛЕННАЯ ПОДПИСКА (INSERT + UPDATE)
-const taskSubscription = supabase
-    .channel('public:tasks')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
-        console.log('Realtime change:', payload.eventType, payload.new);
+// Выносим логику в отдельную функцию, чтобы не писать дважды
+const handleRealtimeChange = (payload) => {
+    console.log(`Realtime change in [${payload.table}]:`, payload.eventType, payload.new);
 
-        if (payload.eventType === 'INSERT') {
-            insertTaskIntoDOM(payload.new);
-        } 
-        else if (payload.eventType === 'UPDATE') {
-            updateTaskRowUI(payload.new);
-        }
-        else if (payload.eventType === 'DELETE') {
-            const row = document.getElementById(`task-row-${payload.old.id}`);
-            if (row) row.remove();
-            document.querySelectorAll(`.phantom-${payload.old.id}`).forEach(el => el.remove());
-        }
-    })
+    // ВАЖНО: Игнорируем события из другой таблицы!
+    // Если мы смотрим платные (tasks), а обновилась бесплатная (free_tasks) - ничего не делаем.
+    if (payload.table !== currentTable) return;
+
+    if (payload.eventType === 'INSERT') {
+        insertTaskIntoDOM(payload.new);
+    } 
+    else if (payload.eventType === 'UPDATE') {
+        updateTaskRowUI(payload.new);
+    }
+    else if (payload.eventType === 'DELETE') {
+        const row = document.getElementById(`task-row-${payload.old.id}`);
+        if (row) row.remove();
+        document.querySelectorAll(`.phantom-${payload.old.id}`).forEach(el => el.remove());
+    }
+};
+
+// Подписываемся сразу на ДВЕ таблицы в одном канале
+const taskSubscription = supabase
+    .channel('all-tasks-channel')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, handleRealtimeChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'free_tasks' }, handleRealtimeChange)
     .subscribe();
+
 // ФУНКЦИЯ ТОЧЕЧНОГО ОБНОВЛЕНИЯ СТРОКИ
 function updateTaskRowUI(t) {
     const row = document.getElementById(`task-row-${t.id}`);

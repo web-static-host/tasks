@@ -146,33 +146,3 @@ async function loadAdminSettings() {
 window.updateTechSet = async function(userId, field, value) {
     await supabase.from('specialist_settings').update({ [field]: value }).eq('user_id', userId);
 };
-
-// --- 4. КАТАЛОГ УСЛУГ ---
-async function loadAdminCatalog() {
-    const container = document.getElementById('admin-catalog-list') || document.getElementById('tab-services'); 
-    // Проверь ID в HTML, выше в твоем коде было два разных варианта
-    if (!container) return;
-
-    const { data: catalog, error } = await supabase.from('task_catalog').select('*').order('category');
-    if (error) return;
-
-    let html = `<div class="table-responsive"><table class="table table-sm table-hover align-middle">
-        <thead class="table-light"><tr><th>Категория</th><th>Задача</th><th>Мин.</th><th>Цена</th><th>Тип</th></tr></thead>
-        <tbody>`;
-    
-    catalog.forEach(item => {
-        html += `
-            <tr>
-                <td><small class="text-muted">${item.category}</small></td>
-                <td><span class="fw-medium">${item.task_name}</span></td>
-                <td><input type="number" class="form-control form-control-sm" style="width:70px" value="${item.default_duration}" onchange="updateCatalogItem(${item.id}, 'default_duration', this.value)"></td>
-                <td><input type="number" class="form-control form-control-sm" style="width:100px" value="${item.default_price}" onchange="updateCatalogItem(${item.id}, 'default_price', this.value)"></td>
-                <td>${item.is_paid ? '💰' : '🆓'}</td>
-            </tr>`;
-    });
-    container.innerHTML = html + '</tbody></table></div>';
-}
-
-window.updateCatalogItem = async function(id, field, value) {
-    await supabase.from('task_catalog').update({ [field]: value }).eq('id', id);
-};

@@ -25,9 +25,9 @@ function applySavedFiltersVisuals() {
     }
 }
 
-let activeTechFilter = localStorage.getItem('activeTechFilter') || ''; 
-let currentTable = 'tasks'; 
-let onlyMyTasksFilter = false;
+window.activeTechFilter = localStorage.getItem('activeTechFilter') || ''; 
+window.currentTable = 'tasks'; 
+window.onlyMyTasksFilter = false;
 
 // 1. Инициализация переключателей вкладок (Платные/Бесплатные)
 function initTableTabs() {
@@ -52,23 +52,23 @@ function initTableTabs() {
 
 // Переключение фильтра по технарям
 window.setTechFilter = (techName, btn) => {
-    activeTechFilter = techName;
+    window.activeTechFilter = techName;
     localStorage.setItem('activeTechFilter', techName); // Сохраняем в браузер
 
     const buttons = document.querySelectorAll('#tech-filters .btn');
     buttons.forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
 
-
-
-    loadTasks();
+    if (typeof loadTasks === 'function') {
+        loadTasks();
+    }
 };
 
 function initFilters() {
     const allUsers = CONFIG.USERS || [];
-    if (!activeTechFilter && CONFIG.USERS && CONFIG.USERS.length > 0) {
-        const firstTech = CONFIG.USERS.find(u => u.role === 'specialist');
-        if (firstTech) activeTechFilter = firstTech.name;
+    if (!window.activeTechFilter && CONFIG.USERS && CONFIG.USERS.length > 0) {
+    const firstTech = CONFIG.USERS.find(u => u.role === 'specialist');
+    if (firstTech) window.activeTechFilter = firstTech.name;
     }
     const hideDone = document.getElementById('hideDone');
     const onlyMyTasks = document.getElementById('onlyMyTasks');

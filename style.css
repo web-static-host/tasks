@@ -376,6 +376,27 @@ html, body {
     text-align: center !important;
 }
 
+/* Отдел */
+#th-dept {
+    width: 110px !important;
+    min-width: 110px !important;
+    max-width: 110px !important;
+}
+
+/* Менеджер */
+#th-user-role {
+    width: 130px !important;
+    min-width: 130px !important;
+    max-width: 130px !important;
+}
+
+/* ИНН (6-я колонка) */
+.table th:nth-child(6),
+.table td:nth-child(6) {
+    width: 100px !important;
+    min-width: 100px !important;
+}
+
 /* Настройка ширины статуса и растягивание плашки */
 .cell-status {
     width: 110px !important;
@@ -483,3 +504,4 @@ html, body {
 .table-responsive {
     overflow-anchor: none !important;
 }
+

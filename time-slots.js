@@ -31,7 +31,7 @@ async function updateFreeSlots(targetTime = null) {
     const specSelect = document.getElementById('specialist');
     const dateInput = document.getElementById('date');
     const timeSelect = document.getElementById('time');
-    const taskType = document.querySelector('input[name="modalTaskType"]:checked')?.value;
+    const taskType = document.getElementById('hiddenTaskType')?.value;
 
     if (!specSelect || !dateInput || !timeSelect) return;
     if (taskType === 'free') return;
