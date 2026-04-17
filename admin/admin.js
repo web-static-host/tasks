@@ -1,13 +1,7 @@
-if (typeof supabase === 'undefined') {
-    var supabase; 
-}
-
-try {
-    // Используем данные из твоего CONFIG
-    supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
-    console.log("✅ Supabase доступен");
-} catch (err) {
-    console.error("❌ Ошибка инициализации Supabase:", err);
+if (typeof supabase !== 'undefined') {
+    console.log("✅ Supabase успешно подтянут из config.js");
+} else {
+    console.error("❌ Ошибка: config.js не передал настройки Supabase");
 }
 
 // 1. Управление доступом (шестеренка на главной)
@@ -109,6 +103,9 @@ function loadDataForTab(target) {
     }
     else if (target === '#tab-services' && typeof loadAdminCatalog === 'function') {
         loadAdminCatalog();
+    }
+    else if (target === '#tab-history') {
+        loadAdminHistory();
     }
 }
 

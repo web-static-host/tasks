@@ -3,15 +3,22 @@ let editTaskId = null;
 
 // Функция-загрузчик данных из БД
 async function loadTaskCatalog() {
-    const { data, error } = await supabase
+    const { data: catalog, error: catError } = await supabase
         .from('task_catalog')
         .select('*')
         .eq('is_active', true);
 
-    if (error) return console.error("Ошибка каталога:", error);
+    if (catError) return console.error("Ошибка каталога:", catError);
     
-    window.taskCatalog = data; 
-    console.log("Каталог задач загружен из БД");
+    const { data: skills, error: skillError } = await supabase
+        .from('specialist_skills')
+        .select('*');
+        
+    if (skillError) console.error("Ошибка навыков:", skillError);
+    
+    window.taskCatalog = catalog; 
+    window.specialistSkills = skills || [];
+    console.log("Каталог и навыки загружены");
 }
 
 // 1. ДЕЛЕГИРОВАНИЕ ОТПРАВКИ ФОРМЫ (чтобы работало на динамической модалке)
@@ -200,48 +207,96 @@ document.addEventListener('dynamicModalReady', async (e) => {
     // Заполнение категорий
     const catSelect = document.getElementById('category');
     const taskSelect = document.getElementById('taskName');
-    
-    if (catSelect && catSelect.tagName === 'SELECT') {
-        catSelect.innerHTML = '<option value="">Выберите категорию...</option>';
-        
-        const categories = [...new Set(
-            window.taskCatalog
-                .filter(item => item.task_type === type)
-                .map(item => item.category)
-        )].sort();
+    const specSelect = document.getElementById('specialist');
 
-        categories.forEach(cat => {
-            catSelect.add(new Option(cat, cat));
-        });
+    window.smartUpdateDropdowns = function(source) {
+        const currentCat = catSelect ? catSelect.value : 'Демонстрация';
+        const currentTask = taskSelect ? taskSelect.value : '';
+        const currentSpec = specSelect ? specSelect.value : '';
 
-        // Обновление задач при выборе категории
-        catSelect.onchange = () => {
-            const selectedCat = catSelect.value;
-            taskSelect.innerHTML = '<option value="">Выберите задачу...</option>';
+        let specId = null;
+        if (currentSpec && CONFIG.USERS) {
+            const u = CONFIG.USERS.find(x => x.name === currentSpec);
+            if (u) specId = u.id;
+        }
+
+        if (source === 'init' || source === 'specialist') {
+            let allowedTasks = window.taskCatalog.filter(t => t.task_type === type);
             
-            const filteredTasks = window.taskCatalog.filter(t => 
-                t.category === selectedCat && t.task_type === type
-            );
+            if (specId) {
+                const specTaskIds = window.specialistSkills.filter(s => s.user_id === specId).map(s => s.task_id);
+                allowedTasks = allowedTasks.filter(t => specTaskIds.includes(t.id));
+            }
 
-            filteredTasks.forEach(t => {
-                const opt = new Option(t.task_name, t.task_name);
-                opt.dataset.duration = t.default_duration;
-                opt.dataset.price = t.default_price || 0;
-                taskSelect.add(opt);
-            });
-            
-            if (typeof updateFreeSlots === 'function') updateFreeSlots();
-        };
-    } else if (type === 'demo') {
-        // Если это демо, сразу подгружаем задачи
-        taskSelect.innerHTML = '<option value="">Выберите задачу...</option>';
-        const filteredTasks = window.taskCatalog.filter(t => t.task_type === 'demo');
-        filteredTasks.forEach(t => {
-            const opt = new Option(t.task_name, t.task_name);
-            opt.dataset.duration = t.default_duration;
-            taskSelect.add(opt);
-        });
-    }
+            if (catSelect && catSelect.tagName === 'SELECT') {
+                const cats = [...new Set(allowedTasks.map(t => t.category))].sort();
+                catSelect.innerHTML = '<option value="">Выберите категорию...</option>';
+                cats.forEach(c => catSelect.add(new Option(c, c)));
+                if (cats.includes(currentCat)) catSelect.value = currentCat;
+                else if (cats.length === 1) catSelect.value = cats[0]; 
+            }
+
+            if (taskSelect) {
+                const activeCat = (catSelect && catSelect.tagName === 'SELECT') ? catSelect.value : 'Демонстрация';
+                const finalTasks = allowedTasks.filter(t => type === 'demo' ? true : t.category === activeCat);
+                taskSelect.innerHTML = '<option value="">Выберите задачу...</option>';
+                finalTasks.forEach(t => {
+                    const opt = new Option(t.task_name, t.task_name);
+                    opt.dataset.duration = t.default_duration;
+                    opt.dataset.price = t.default_price || 0;
+                    taskSelect.add(opt);
+                });
+                if (finalTasks.some(t => t.task_name === currentTask)) taskSelect.value = currentTask;
+            }
+        }
+
+        if (source === 'category') {
+            let allowedTasks = window.taskCatalog.filter(t => t.task_type === type && t.category === currentCat);
+            if (specId) {
+                const specTaskIds = window.specialistSkills.filter(s => s.user_id === specId).map(s => s.task_id);
+                allowedTasks = allowedTasks.filter(t => specTaskIds.includes(t.id));
+            }
+            if (taskSelect) {
+                taskSelect.innerHTML = '<option value="">Выберите задачу...</option>';
+                allowedTasks.forEach(t => {
+                    const opt = new Option(t.task_name, t.task_name);
+                    opt.dataset.duration = t.default_duration;
+                    opt.dataset.price = t.default_price || 0;
+                    taskSelect.add(opt);
+                });
+                if (allowedTasks.some(t => t.task_name === currentTask)) taskSelect.value = currentTask;
+            }
+        }
+
+        if (source !== 'specialist') {
+            const newTask = taskSelect ? taskSelect.value : '';
+            let allowedSpecIds = null;
+
+            if (newTask) {
+                const t = window.taskCatalog.find(x => x.task_name === newTask && x.task_type === type);
+                if (t) allowedSpecIds = window.specialistSkills.filter(s => s.task_id === t.id).map(s => s.user_id);
+            } else if (currentCat && currentCat !== 'Демонстрация') {
+                const catTaskIds = window.taskCatalog.filter(t => t.category === currentCat && t.task_type === type).map(t => t.id);
+                allowedSpecIds = window.specialistSkills.filter(s => catTaskIds.includes(s.task_id)).map(s => s.user_id);
+            }
+
+            if (specSelect && CONFIG.USERS) {
+                const techUsers = CONFIG.USERS.filter(u => u.role === 'specialist' || u.role === 'specialist_1c');
+                let availableSpecs = allowedSpecIds ? techUsers.filter(u => allowedSpecIds.includes(u.id)) : techUsers;
+                
+                specSelect.innerHTML = '<option value="">Выберите специалиста...</option>';
+                availableSpecs.forEach(s => specSelect.add(new Option(s.name, s.name)));
+                if (availableSpecs.some(s => s.name === currentSpec)) specSelect.value = currentSpec;
+            }
+        }
+        if (typeof updateFreeSlots === 'function' && source !== 'init') updateFreeSlots();
+    };
+
+    if (catSelect) catSelect.onchange = () => window.smartUpdateDropdowns('category');
+    if (taskSelect) taskSelect.addEventListener('change', () => window.smartUpdateDropdowns('task'));
+    if (specSelect) specSelect.onchange = () => window.smartUpdateDropdowns('specialist');
+
+    window.smartUpdateDropdowns('init');
 });
 
 // 3. ДЕЛЕГИРОВАНИЕ СОБЫТИЙ CHANGE (Длительность и слоты)

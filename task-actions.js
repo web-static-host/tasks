@@ -98,22 +98,33 @@ window.updateTaskStatus = async (id, newStatus, comment = null) => {
     }
 };
 
-window.openReschedule = (id, spec, date) => {
-    document.getElementById('reschedule-id-label').innerText = id;
-    document.getElementById('reschedule-task-id').value = id;
-    document.getElementById('reschedule-spec-name').value = spec;
-    
-    // Сначала показываем модалку
-    const modal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
-    modal.show();
+window.openReschedule = async (id, spec, date) => {
+    document.getElementById('reschedule-id-label').innerText = id;
+    document.getElementById('reschedule-task-id').value = id;
+    document.getElementById('reschedule-spec-name').value = spec;
+    
+    // Проверяем, это весь день?
+    const { data: task } = await supabase.from('tasks').select('category, duration').eq('id', id).single();
+    const isFullDay = task && task.category === 'Отсутствует' && task.duration >= 480;
 
-    // Инициализируем или обновляем дату через Flatpickr после того, как поле появилось
-    const dateInput = document.getElementById('new-date');
-    if (dateInput._flatpickr) {
-        dateInput._flatpickr.setDate(date);
-    }
-    
-    updateRescheduleSlots();
+    const timeBlock = document.getElementById('new-time').parentElement;
+    const btn = document.getElementById('confirm-reschedule-btn');
+
+    if (isFullDay) {
+        timeBlock.classList.add('d-none'); // Прячем время
+        btn.disabled = false; // Сразу разрешаем перенос
+    } else {
+        timeBlock.classList.remove('d-none');
+        btn.disabled = true; 
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
+    modal.show();
+
+    const dateInput = document.getElementById('new-date');
+    if (dateInput._flatpickr) dateInput._flatpickr.setDate(date);
+    
+    if (!isFullDay) updateRescheduleSlots();
 };
 
 async function updateRescheduleSlots() {
@@ -129,14 +140,18 @@ async function updateRescheduleSlots() {
     const isToday = date === now.toISOString().split('T')[0];
 
     try {
-    const taskId = document.getElementById('reschedule-task-id').value;
-
-    // 1. Узнаем длительность задачи, которую ПЕРЕНОСИМ
-    const { data: currentTask } = await supabase.from('tasks').select('duration').eq('id', taskId).single();
-    const movingDuration = currentTask?.duration || 30;
-
-    // 2. Получаем занятые слоты (добавили duration в select)
-    // Снова добавляем 'status' в select
+        const taskId = document.getElementById('reschedule-task-id').value;
+        
+        // Мы просим базу данных дать нам не только длительность (duration), но и ИМЯ задачи (task_name)
+        const { data: currentTask } = await supabase.from('tasks').select('duration, task_name').eq('id', taskId).single();
+        
+        let movingDuration = currentTask?.duration;
+        
+        // Если длительность равна 0 (потому что задача на паузе), мы ищем её в справочнике по имени
+        if (!movingDuration || movingDuration === 0) {
+            const catalogItem = (window.taskCatalog || []).find(c => c.task_name === currentTask?.task_name);
+            movingDuration = catalogItem ? catalogItem.default_duration : 30;
+        }
 const { data: occupied } = await supabase.from('tasks').select('id, time, duration, status').eq('specialist', spec).eq('date', date);
 
 const freeStatuses = ['Выполнено', 'Возврат', 'Ожидание от клиента', 'Ожидание от менеджера', 'Ожидание от тех.спеца', 'Не отвечает'];
@@ -205,49 +220,40 @@ window.confirmReschedule = async () => {
     const comment = document.getElementById('reschedule-comment')?.value || null;
 
     try {
-        // 1. Сначала получаем старые данные
-        const { data: oldTask } = await supabase.from('tasks').select('date, time, status').eq('id', id).single();
+        const { data: oldTask } = await supabase.from('tasks').select('*').eq('id', id).single();
+        
+        // ОПРЕДЕЛЯЕМ СТАТУС
+        const isBusyTask = ['Внутренняя', 'Отсутствует'].includes(oldTask.category);
+        const targetStatus = isBusyTask ? 'Занято' : 'Перенесен';
 
-        // 2. Обновляем задачу
+        // ВОССТАНАВЛИВАЕМ ДЛИТЕЛЬНОСТЬ
+        let finalDuration = oldTask.duration;
+        if (!finalDuration || finalDuration === 0) {
+            const catalogItem = (window.taskCatalog || []).find(c => c.task_name === oldTask.task_name);
+            finalDuration = catalogItem ? catalogItem.default_duration : 30;
+        }
+
         const { error } = await supabase.from('tasks').update({
             date: newDate,
             time: newTime,
-            status: 'Перенесен' 
+            status: targetStatus,
+            duration: finalDuration // Возвращаем длительность из справочника
         }).eq('id', id);
 
         if (!error) {
-            // 3. Собираем изменения для истории
             const changes = {};
-            
-            // Сравниваем дату
-            if (oldTask.date !== newDate) {
-                changes.date = { old: oldTask.date, new: newDate };
-            }
-            
-            // Сравниваем время (обрезаем до 5 символов: 10:00)
-            const oldTimeShort = oldTask.time?.substring(0, 5);
-            if (oldTimeShort !== newTime) {
-                changes.time = { old: oldTimeShort, new: newTime };
-            }
+            if (oldTask.date !== newDate) changes.date = { old: oldTask.date, new: newDate };
+            const oldT = oldTask.time?.substring(0, 5);
+            if (oldT !== newTime) changes.time = { old: oldT, new: newTime };
+            if (oldTask.status !== targetStatus) changes.status = { old: oldTask.status, new: targetStatus };
+            if (oldTask.duration !== finalDuration) changes.duration = { old: oldTask.duration, new: finalDuration };
 
-            // Добавляем инфу о смене статуса
-            if (oldTask.status !== 'Перенесен') {
-                changes.status = { old: oldTask.status, new: 'Перенесен' };
-            }
-
-            // Записываем историю, если изменения есть
             if (Object.keys(changes).length > 0) {
-                // Если у тебя есть функция logTaskAction — используй её:
                 await logTaskAction(id, 'reschedule', changes, comment);
             }
-
-            // Закрываем модалку и обновляем список
             bootstrap.Modal.getInstance(document.getElementById('rescheduleModal')).hide();
-
         }
-    } catch (e) { 
-        console.error('Ошибка в confirmReschedule:', e); 
-    }
+    } catch (e) { console.error('Ошибка в confirmReschedule:', e); }
 };
 
 window.deleteTask = async (id) => {
@@ -259,34 +265,118 @@ window.deleteTask = async (id) => {
 
 window.copyTask = async (id) => {
     try {
+        if (!window.taskCatalog && typeof loadTaskCatalog === 'function') {
+            await loadTaskCatalog();
+        }
+
         const targetTable = (typeof currentTable !== 'undefined') ? currentTable : 'tasks';
         const { data: task, error } = await supabase.from(targetTable).select('*').eq('id', id).single();
         
         if (error) throw error;
 
-        // ВАЖНО: Мы НЕ ставим editMode = true. 
-        // Это заставит форму думать, что мы создаем НОВУЮ задачу.
+        // === ПЕРЕХВАТ ТЕХНИЧЕСКИХ ЗАДАЧ ПРИ КОПИРОВАНИИ ===
+        const isBusyTask = ['Внутренняя', 'Отсутствует'].includes(task.category);
+        
+        if (isBusyTask) {
+            window.editBusyTaskId = null; // Критично: при копировании это НОВАЯ задача, а не правка старой
+            const isFullDay = task.category === 'Отсутствует' && task.duration >= 480;
+            
+            // Открываем модалку занять время
+            const modalElement = document.getElementById('busyModal');
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+
+            setTimeout(async () => {
+                const typeSelect = document.getElementById('busy-type-select');
+                const timeFields = document.getElementById('busy-time-fields');
+                
+                if (typeSelect) {
+                    typeSelect.value = isFullDay ? 'full-day' : 'slot';
+                    // При копировании НЕ блокируем опции, пусть менеджер может поменять тип
+                    for(let opt of typeSelect.options) opt.disabled = false;
+                }
+                
+                if (timeFields) {
+                    if (isFullDay) timeFields.classList.add('d-none');
+                    else timeFields.classList.remove('d-none');
+                }
+
+                const dateInput = document.getElementById('busy-date');
+                if (dateInput && !dateInput._flatpickr) {
+                    flatpickr(dateInput, { ...flatpickrConfig });
+                }
+                if (dateInput && dateInput._flatpickr) {
+                    dateInput._flatpickr.setDate(task.date);
+                }
+
+                // Загружаем слоты и подставляем время
+                if (!isFullDay && typeof updateBusySlots === 'function') {
+                    await updateBusySlots(task.date);
+                    const timeSelect = document.getElementById('busy-time');
+                    if (timeSelect) timeSelect.value = task.time.substring(0,5);
+                }
+
+                const durationInput = document.getElementById('busy-duration');
+                if (durationInput && !isFullDay) {
+                    const h = Math.floor(task.duration / 60);
+                    const m = task.duration % 60;
+                    durationInput.value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                }
+
+                const commentInput = document.getElementById('busy-comment');
+                if (commentInput) commentInput.value = task.comment || '';
+
+                const btn = document.getElementById('busy-submit-btn');
+                if (btn) btn.innerText = "Создать копию"; // Меняем текст кнопки
+
+            }, 150);
+            
+            return; // Выходим из функции
+        }
         editMode = false;
         editTaskId = null;
 
         const isFree = targetTable === 'free_tasks';
-        const typeValue = isFree ? 'free' : (task.task_type || 'paid');
+        
+        // 1. ТОЧЕЧНАЯ ПРАВКА: Жестко проверяем на Демонстрацию
+        const typeValue = isFree ? 'free' : (task.category === 'Демонстрация' ? 'demo' : 'paid');
+        
         openDynamicModal(typeValue, false);
 
-        setTimeout(async () => {
-            // Заполняем поля из старой задачи
-            document.getElementById('category').value = task.category || '';
-            document.getElementById('category').dispatchEvent(new Event('change', { bubbles: true }));
-            document.getElementById('taskName').value = task.task_name;
-            document.getElementById('specialist').value = task.specialist;
+        setTimeout(() => {
+            const catEl = document.getElementById('category');
+            if (catEl) {
+                catEl.value = task.category || '';
+                if (catEl.tagName === 'SELECT') catEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            
+            setTimeout(() => {
+                const taskSelect = document.getElementById('taskName');
+                if (taskSelect) {
+                    if (![...taskSelect.options].some(o => o.value === task.task_name)) {
+                        taskSelect.add(new Option(task.task_name, task.task_name));
+                    }
+                    taskSelect.value = task.task_name;
+                    taskSelect.dispatchEvent(new Event('change', { bubbles: true })); 
+                }
+                
+                setTimeout(async () => {
+                    const specSelect = document.getElementById('specialist');
+                    if (specSelect) specSelect.value = task.specialist || '';
+                    
+                    if (!isFree) {
+                        const dateField = document.getElementById('date');
+                        if (dateField._flatpickr) dateField._flatpickr.setDate(task.date);
+                        else dateField.value = task.date;
+                        if (typeof updateFreeSlots === 'function') await updateFreeSlots(); 
+                    }
+                }, 50);
+            }, 50);
+
             document.getElementById('inn').value = task.inn;
             document.getElementById('price').value = task.price || 0;
             document.getElementById('taskComment').value = task.comment || '';
-
-            // ОЧИЩАЕМ поле Битрикс, 
             document.getElementById('bitrix').value = '';
 
-            // Длительность
             const durationField = document.getElementById('taskDuration');
             if (durationField) {
                 const dbDuration = task.duration || 30;
@@ -295,22 +385,9 @@ window.copyTask = async (id) => {
                 durationField.value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
             }
 
-            if (!isFree) {
-                // Подставляем ту же дату и обновляем свободные слоты
-                const dateField = document.getElementById('date');
-                if (dateField._flatpickr) {
-                    dateField._flatpickr.setDate(task.date);
-                } else {
-                    dateField.value = task.date;
-                }
-                await updateFreeSlots(); // Загружаем актуальные слоты на эту дату
-            }
-
-            // Меняем заголовки, чтобы менеджер понимал, что создается копия
             document.querySelector('#taskModal .modal-title').innerText = `Копирование задачи (Новая)`;
             document.getElementById('submit-btn').innerText = "Создать копию";
             
-            new bootstrap.Modal(document.getElementById('taskModal')).show();
         }, 100);
 
     } catch (e) { 
@@ -331,6 +408,67 @@ window.openEditTask = async (id) => {
         
         if (error) throw error;
 
+        // === ПЕРЕХВАТ ТЕХНИЧЕСКИХ ЗАДАЧ ("ЗАНЯТО") ===
+        if (['Внутренняя', 'Отсутствует'].includes(task.category)) {
+            window.editBusyTaskId = id; // Флаг редактирования
+            const isFullDay = task.category === 'Отсутствует' && task.duration >= 480;
+            
+            // 1. СНАЧАЛА открываем модалку, чтобы HTML-элементы появились на экране
+            const modalElement = document.getElementById('busyModal');
+            // getOrCreateInstance предотвращает баг с темным фоном
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+
+            // 2. Даем браузеру микро-паузу (150мс), чтобы он успел отрисовать окно
+            setTimeout(async () => {
+                const typeSelect = document.getElementById('busy-type-select');
+                const timeFields = document.getElementById('busy-time-fields');
+                
+                if (typeSelect) {
+                    typeSelect.value = isFullDay ? 'full-day' : 'slot';
+                    for(let opt of typeSelect.options) opt.disabled = (opt.value === 'range');
+                }
+                if (timeFields) {
+                    if (isFullDay) timeFields.classList.add('d-none');
+                    else timeFields.classList.remove('d-none');
+                }
+
+                const dateInput = document.getElementById('busy-date');
+                
+                // --- ГЛАВНОЕ ИСПРАВЛЕНИЕ: ПРИНУДИТЕЛЬНЫЙ ЗАПУСК КАЛЕНДАРЯ ---
+                // Если после перезагрузки страницы календаря еще нет, создаем его
+                if (dateInput && !dateInput._flatpickr) {
+                    flatpickr(dateInput, { ...flatpickrConfig });
+                }
+
+                // Теперь безопасно ставим дату
+                if (dateInput && dateInput._flatpickr) {
+                    dateInput._flatpickr.setDate(task.date);
+                }
+
+                // Запускаем полную загрузку доступного времени
+                if (!isFullDay && typeof updateBusySlots === 'function') {
+                    await updateBusySlots(task.date);
+                }
+
+                const durationInput = document.getElementById('busy-duration');
+                if (durationInput && !isFullDay) {
+                    const h = Math.floor(task.duration / 60);
+                    const m = task.duration % 60;
+                    durationInput.value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                }
+
+                const commentInput = document.getElementById('busy-comment');
+                if (commentInput) commentInput.value = task.comment || '';
+
+                const btn = document.getElementById('busy-submit-btn');
+                if (btn) btn.innerText = "Сохранить изменения";
+
+            }, 150); // Конец паузы
+            
+            return; // Выходим, обычную форму не открываем
+        }
+
+        // === СТАНДАРТНАЯ ЛОГИКА ДЛЯ ОБЫЧНЫХ ЗАДАЧ ===
         editMode = true;
         editTaskId = id;
 
@@ -346,69 +484,73 @@ window.openEditTask = async (id) => {
         openDynamicModal(modalType, true);
 
         // 3. Ждем, пока DOM модалки отрисуется
-        setTimeout(async () => {
-            // Подставляем категорию (для платных задач)
+        // 3. Ждем, пока DOM модалки отрисуется
+        setTimeout(() => {
             const catSelect = document.getElementById('category');
             if (catSelect && catSelect.tagName === 'SELECT' && task.category) {
+                if (![...catSelect.options].some(o => o.value === task.category)) {
+                    catSelect.add(new Option(task.category, task.category));
+                }
                 catSelect.value = task.category;
                 catSelect.dispatchEvent(new Event('change', { bubbles: true })); 
             }
 
-            // Ждем, пока отработает событие change и сформируются списки задач (taskName)
-            setTimeout(async () => {
+            setTimeout(() => {
                 const taskSelect = document.getElementById('taskName');
-                if (taskSelect) taskSelect.value = task.task_name;
-
-                const specSelect = document.getElementById('specialist');
-                if (specSelect) specSelect.value = task.specialist || '';
-
-                const innInput = document.getElementById('inn');
-                if (innInput) innInput.value = task.inn || '';
-
-                const bitrixInput = document.getElementById('bitrix');
-                if (bitrixInput) bitrixInput.value = task.bitrix_url || '';
-
-                const priceInput = document.getElementById('price');
-                if (priceInput) priceInput.value = task.price || 0;
-
-                const commentInput = document.getElementById('taskComment');
-                if (commentInput) commentInput.value = task.comment || '';
-
-                // Восстанавливаем длительность
-                const durationField = document.getElementById('taskDuration');
-                if (durationField) {
-                    const dbDuration = task.duration || 30;
-                    const hours = Math.floor(dbDuration / 60);
-                    const minutes = dbDuration % 60;
-                    durationField.value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                if (taskSelect) {
+                    if (![...taskSelect.options].some(o => o.value === task.task_name)) {
+                        taskSelect.add(new Option(task.task_name, task.task_name));
+                    }
+                    taskSelect.value = task.task_name;
+                    taskSelect.dispatchEvent(new Event('change', { bubbles: true })); 
                 }
 
-                // Дата и время (только для платных и демо)
-                if (modalType !== 'free') {
-                    const dateField = document.getElementById('date');
-                    if (dateField && dateField._flatpickr) {
-                        dateField._flatpickr.setDate(task.date);
+                setTimeout(async () => {
+                    const specSelect = document.getElementById('specialist');
+                    if (specSelect) specSelect.value = task.specialist || '';
+
+                    const innInput = document.getElementById('inn');
+                    if (innInput) innInput.value = task.inn || '';
+
+                    const bitrixInput = document.getElementById('bitrix');
+                    if (bitrixInput) bitrixInput.value = task.bitrix_url || '';
+
+                    const priceInput = document.getElementById('price');
+                    if (priceInput) priceInput.value = task.price || 0;
+
+                    const commentInput = document.getElementById('taskComment');
+                    if (commentInput) commentInput.value = task.comment || '';
+
+                    const durationField = document.getElementById('taskDuration');
+                    if (durationField) {
+                        let dbDuration = task.duration;
+                        if (!dbDuration || dbDuration === 0) {
+                            const catalogItem = (window.taskCatalog || []).find(c => c.task_name === task.task_name);
+                            dbDuration = catalogItem ? catalogItem.default_duration : 30;
+                        }
+                        const hours = Math.floor(dbDuration / 60);
+                        const minutes = dbDuration % 60;
+                        durationField.value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
                     }
-                    
-                    // Загружаем свободные слоты и подставляем время из задачи
-                    if (typeof updateFreeSlots === 'function') {
-                        await updateFreeSlots(task.time);
+
+                    if (modalType !== 'free') {
+                        const dateField = document.getElementById('date');
+                        if (dateField && dateField._flatpickr) {
+                            dateField._flatpickr.setDate(task.date);
+                        }
+                        if (typeof updateFreeSlots === 'function') await updateFreeSlots(task.time);
                     }
-                }
 
-                // Показываем блок с причиной изменения (для истории)
-                const logBlock = document.getElementById('changeLogBlock');
-                if (logBlock) logBlock.classList.remove('d-none');
+                    const logBlock = document.getElementById('changeLogBlock');
+                    if (logBlock) logBlock.classList.remove('d-none');
 
-                const submitBtn = document.getElementById('submit-btn');
-                if (submitBtn) submitBtn.innerText = "Сохранить изменения";
+                    const submitBtn = document.getElementById('submit-btn');
+                    if (submitBtn) submitBtn.innerText = "Сохранить изменения";
 
-                // Наконец, показываем саму модалку
-                new bootstrap.Modal(document.getElementById('taskModal')).show();
-
-            }, 50); // Пауза для формирования select с задачами
-
-        }, 50); // Пауза для рендера HTML модалки
+                    new bootstrap.Modal(document.getElementById('taskModal')).show();
+                }, 50); 
+            }, 50); 
+        }, 50); 
 
     } catch (e) {
         console.error('Ошибка при открытии редактирования:', e);
@@ -417,9 +559,32 @@ window.openEditTask = async (id) => {
 };
 
 window.handleBitrixClick = async (id, currentStatus) => {
-    if (currentUser.role === 'specialist' && (currentStatus === 'Новая' || currentStatus === 'Перенесен')) {
-        await window.updateTaskStatus(id, 'Взят в работу');
-    }
+    if (!currentUser) return;
+
+    // 1. Проверяем строковую роль (для обычных технарей и 1С)
+    const role = currentUser.role || '';
+    const isTechRole = role === 'specialist' || role === 'specialist_1c';
+    
+    // 2. Проверяем наличие в графике работы (спасает, если человек Админ, но работает руками)
+    const isInTechConfig = CONFIG.SPECIALISTS && CONFIG.SPECIALISTS[currentUser.name] !== undefined;
+
+    // Если совпало хотя бы одно условие — человек имеет права технаря
+    const isTech = isTechRole || isInTechConfig;
+
+    // Строго старая рабочая логика переключения
+    if (isTech && (currentStatus === 'Новая' || currentStatus === 'Перенесен')) {
+        await window.updateTaskStatus(id, 'Взят в работу');
+    }
+};
+
+window.copyBitrixLink = async (id, url, currentStatus) => {
+    try {
+        await navigator.clipboard.writeText(url);
+        // После успешного копирования запускаем ту же логику смены статуса
+        await window.handleBitrixClick(id, currentStatus);
+    } catch (err) {
+        console.error('Ошибка копирования:', err);
+    }
 };
 
 document.getElementById('new-time')?.addEventListener('change', () => {

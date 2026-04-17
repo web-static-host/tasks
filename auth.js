@@ -114,7 +114,9 @@ async function processUserRoles(user) {
     
     let legacyRole = 'manager';
     if (roleIds.includes(1)) legacyRole = 'admin';
-    else if (roleIds.includes(3)) legacyRole = 'specialist'; // Тот самый жесткий фильтр
+    else if (roleIds.includes(3)) legacyRole = 'specialist'; 
+    else if (roleIds.includes(4)) legacyRole = 'specialist_1c';
+    else if (roleIds.includes(5)) legacyRole = 'director';
 
     return {
         id: user.id,

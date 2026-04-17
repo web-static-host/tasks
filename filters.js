@@ -123,71 +123,71 @@ function initFilters() {
 
 function setupInterface() {
     if (!currentUser) return;
-    const specialists = (CONFIG.USERS || []).filter(u => u.role === 'specialist');
+    
     const userInfo = document.getElementById('user-info');
-    const thRole = document.getElementById('th-user-role');
-    const addBtn = document.getElementById('add-task-btn');
+    const adminLink = document.getElementById('admin-link');
+    const addTaskContainer = document.getElementById('add-task-btn-container'); 
     const busyBtn = document.getElementById('busy-task-btn');
     const techContainer = document.getElementById('tech-filters-container');
     const techFilters = document.getElementById('tech-filters');
+    const onlyMyTasksContainer = document.getElementById('only-my-tasks-container');
 
-    const adminLink = document.getElementById('admin-link');
+    if (userInfo) userInfo.innerText = currentUser.name;
+
+    // Ссылка на админку (только для роли admin)
     if (adminLink) {
         if (currentUser.role === 'admin') {
-            adminLink.classList.remove('d-none'); // Показываем админу
-            adminLink.href = 'admin/admin.html'; // Укажи правильный путь к файлу админки
+            adminLink.classList.remove('d-none'); 
+            adminLink.href = 'admin/admin.html'; 
         } else {
-            adminLink.classList.add('d-none'); // Скрываем от остальных
+            adminLink.classList.add('d-none'); 
         }
     }
 
-    if (userInfo) {
-    userInfo.innerText = currentUser.name;
-    }
+    // --- ЛОГИКА КНОПОК ДЕЙСТВИЙ ---
 
-    // --- КНОПКИ ДЕЙСТВИЙ ---
-    if (currentUser.role === 'specialist') {
-        if (addBtn) addBtn.style.display = 'none';
-        if (busyBtn) {
-            busyBtn.classList.remove('d-none');
-            busyBtn.style.display = 'block';
-        }
-    } else {
-        if (addBtn) addBtn.style.display = 'block';
-        if (busyBtn) {
-            busyBtn.classList.add('d-none');
-            busyBtn.style.display = 'none';
+    // 1. КНОПКА "НОВАЯ ЗАДАЧА" (Видна всем, КРОМЕ тех.спецов)
+    if (addTaskContainer) {
+        if (currentUser.role === 'specialist') {
+            addTaskContainer.style.setProperty('display', 'none', 'important');
+        } else {
+            addTaskContainer.style.setProperty('display', 'inline-block', 'important');
         }
     }
 
-    // --- СКРЫВАЕМ "МОИ ЗАДАЧИ" ДЛЯ ТЕХНАРЯ (ЖЕСТКИЙ ВАРИАНТ) ---
-const onlyMyTasksContainer = document.getElementById('only-my-tasks-container');
-if (onlyMyTasksContainer) {
-    if (currentUser.role === 'specialist') {
-        onlyMyTasksContainer.classList.add('d-none'); // Добавляем класс Бутстрапа для скрытия
-        onlyMyTasksContainer.style.setProperty('display', 'none', 'important'); // Вбиваем гвоздь
-    } else {
-        onlyMyTasksContainer.classList.remove('d-none');
-        onlyMyTasksContainer.style.display = 'inline-block';
+    // 2. КНОПКА "ЗАНЯТЬ ВРЕМЯ" (Видна всем, КРОМЕ менеджеров и руководителей (director))
+    if (busyBtn) {
+        if (currentUser.role === 'manager' || currentUser.role === 'director') {
+            busyBtn.style.setProperty('display', 'none', 'important');
+        } else {
+            busyBtn.classList.remove('d-none'); // Убираем на всякий случай
+            busyBtn.style.setProperty('display', 'inline-block', 'important');
+        }
     }
-}
 
-    // --- ФИЛЬТРЫ ТЕХНАРЕЙ (для всех ролей) ---
+    // --- ДОПОЛНИТЕЛЬНЫЕ ЭЛЕМЕНТЫ ---
+
+    // Скрываем чекбокс "Мои задачи" для технарей (они и так видят только себя через фильтр)
+    if (onlyMyTasksContainer) {
+        if (currentUser.role === 'specialist') {
+            onlyMyTasksContainer.style.setProperty('display', 'none', 'important');
+        } else {
+            onlyMyTasksContainer.style.setProperty('display', 'inline-block', 'important');
+        }
+    }
+
+    // Отрисовка фильтров технарей в шапке
     if (techContainer && techFilters) {
         techContainer.classList.remove('d-none');
         techFilters.innerHTML = ''; 
 
-        // Берем технарей из уже загруженного CONFIG.USERS
-        const specialists = CONFIG.USERS.filter(u => u.role === 'specialist');
+        const specialists = (CONFIG.USERS || []).filter(u => u.role === 'specialist');
         
         specialists.forEach(tech => {
-            // Если технарь зашел сам, и фильтр еще не выбран — выбираем его
             if (tech.name === currentUser.name && !activeTechFilter) {
                 activeTechFilter = tech.name;
             }
-
             const isActive = tech.name === activeTechFilter;
-
             techFilters.insertAdjacentHTML('beforeend', 
                 `<button type="button" class="btn btn-sm btn-outline-secondary ${isActive ? 'active' : ''}" 
                  onclick="setTechFilter('${tech.name}', this)">${tech.name}</button>`

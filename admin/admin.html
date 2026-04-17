@@ -9,31 +9,40 @@
     <link rel="stylesheet" href="admin-style.css">
 </head>
 <body class="bg-light">
-    <div id="admin-screen" class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 px-3">
-        <h2 class="h4 mb-0">⚙️ Панель управления</h2>
-        <button onclick="location.href='../index.html'" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left"></i> Назад к задачам
-        </button>
-    </div>
-
+    <div id="admin-screen" class="container-fluid p-3 p-md-4">
     <div class="row g-4">
         <div class="col-md-3 col-lg-2">
-            <div class="list-group shadow-sm border-0 sticky-top" style="top: 20px;">
-                <button class="list-group-item list-group-item-action active" data-bs-toggle="pill" data-bs-target="#tab-users">
-                    👥 Сотрудники
-                </button>
-                <button class="list-group-item list-group-item-action" data-bs-toggle="pill" data-bs-target="#tab-tech-config">
-                    ⚙️ Графики технарей
-                </button>
-                <button class="list-group-item list-group-item-action" data-bs-toggle="pill" data-bs-target="#tab-services">
-                    🛠️ Каталог услуг
-                </button>
+            <div class="sticky-top" style="top: 20px;">
+                
+                <div class="d-flex align-items-center mb-3 px-2">
+                    <button onclick="location.href='../index.html'" class="btn btn-link text-dark p-0 me-2 shadow-none" title="Назад к задачам" style="transition: transform 0.2s;">
+                        <svg width="22" height="22" fill="currentColor" viewBox="0 0 16 16" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                            <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+                        </svg>
+                    </button>
+                    <h2 class="h5 mb-0 fw-bold">Панель управления</h2>
+                </div>
+                
+                <div class="list-group shadow-sm border-0">
+                    <button class="list-group-item list-group-item-action active" data-bs-toggle="pill" data-bs-target="#tab-users">
+                        👥 Сотрудники
+                    </button>
+                    <button class="list-group-item list-group-item-action" data-bs-toggle="pill" data-bs-target="#tab-tech-config">
+                        ⚙️ Графики технарей
+                    </button>
+                    <button class="list-group-item list-group-item-action" data-bs-toggle="pill" data-bs-target="#tab-services">
+                        🛠️ Каталог услуг
+                    </button>
+                    <button class="list-group-item list-group-item-action" data-bs-toggle="pill" data-bs-target="#tab-history">
+                        🕒 История
+                    </button>
+                </div>
             </div>
         </div>
+        
 
         <div class="col-md-9 col-lg-10">
-            <div class="tab-content bg-white p-4 rounded-3 shadow-sm min-vh-100">
+            <div class="tab-content bg-white p-4 shadow-sm admin-main-panel">
                 
                 <div class="tab-pane fade show active" id="tab-users">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
@@ -69,13 +78,11 @@
         </div>
 </div>
 
-                <div class="tab-pane fade" id="tab-tech-config">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">⚙️ Графики работы технарей</h5>
+                <div class="tab-pane fade h-100" id="tab-tech-config">
+    <div class="d-flex flex-column h-100">
+        <div id="admin-tech-list">
+            </div>
     </div>
-    
-    <div id="admin-tech-list" class="row g-3">
-        </div>
 </div>
 
 <div class="modal fade" id="techScheduleModal" tabindex="-1" aria-hidden="true">
@@ -131,17 +138,7 @@
 </div>
 
 <div class="tab-pane fade" id="tab-services">
-    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4 border-bottom pb-3">
-        <div>
-            <h4 class="mb-1 fw-bold text-dark">Каталог услуг</h4>
-            <p class="text-muted small mb-0">Управление категориями и регламентами времени</p>
-        </div>
-        <div class="input-group input-group-sm bg-white rounded-pill shadow-sm overflow-hidden" style="width: 280px; border: 1px solid #e9ecef;">
-            <span class="input-group-text bg-transparent border-0 text-muted ps-3"><i class="bi bi-search"></i></span>
-            <input type="text" id="catalogSearch" class="form-control border-0 shadow-none bg-transparent" placeholder="Поиск услуг..." oninput="renderCatalog()">
-        </div>
-    </div>
-
+    <div class="d-flex justify-content-between align-items-center mb-4">
     <ul class="nav nav-pills catalog-pills mb-4" id="catalogTabs" role="tablist">
         <li class="nav-item">
             <button class="nav-link active" id="paid-tab" data-bs-toggle="pill" data-bs-target="#tab-content-paid" type="button">Платные</button>
@@ -153,6 +150,17 @@
             <button class="nav-link" id="demo-tab" data-bs-toggle="pill" data-bs-target="#tab-content-demo" type="button">Демо</button>
         </li>
     </ul>
+    <div class="d-flex gap-3 align-items-center">
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="cat-active-filter" checked onchange="renderCatalog()">
+            <label class="form-check-label small text-muted" for="cat-active-filter">Только активные</label>
+        </div>
+        <input type="text" id="catalogSearch" class="form-control form-control-sm" placeholder="Поиск услуг..." style="width: 200px;" onkeyup="renderCatalog()">
+        <button class="btn btn-primary btn-sm" onclick="openEditCatalogModal()">+ Добавить услугу</button>
+    </div>
+</div>
+
+    
 
     <div class="tab-content" id="catalogTabContent">
         <div class="tab-pane fade show active" id="tab-content-paid">
@@ -164,6 +172,20 @@
         <div class="tab-pane fade" id="tab-content-demo">
             <div id="accordionDemo"></div>
         </div>
+    </div>
+</div>
+
+<div class="tab-pane fade h-100" id="tab-history">
+    <div class="d-flex flex-column h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom flex-shrink-0">
+            <h5 class="mb-0 fw-bold">🕒 История действий</h5>
+            <div class="input-group input-group-sm" style="width: 300px;">
+                <span class="input-group-text bg-white border-end-0 text-muted">🔍</span>
+                <input type="text" id="history-search" class="form-control border-start-0" placeholder="Поиск (ID, имя, текст)..." oninput="filterAdminHistory()" style="box-shadow: none; border-color: #dee2e6;">
+            </div>
+        </div>
+        <div id="admin-history-list" class="flex-grow-1" style="overflow-y: auto; overflow-x: hidden;">
+            </div>
     </div>
 </div>
 
@@ -186,9 +208,9 @@
                         <input type="text" id="cat-name" class="form-control form-control-lg bg-light border-0" placeholder="Например: Настройка рабочего места" required>
                     </div>
                     <div class="row mb-3">
-                        <div class="col-6">
-                            <label class="form-label small fw-bold text-muted">Время (минут)</label>
-                            <input type="number" id="cat-duration" class="form-control form-control-lg bg-light border-0" value="30" step="30" min="30">
+                        <div class="mb-3" id="cat-duration-wrapper">
+                            <label class="form-label small fw-bold">Длительность (мин)</label>
+                            <input type="number" id="cat-duration" class="form-control form-control-sm" step="30" min="30">
                         </div>
                         <div class="col-6 d-flex align-items-center mt-3">
                             <div class="form-check form-switch">
@@ -325,12 +347,13 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="../config.js"></script>
 
     <script src="users.js"></script>
     <script src="admin.js"></script>
     <script src="schedules.js"></script>
     <script src="katalog.js"></script>
+    <script src="history.js"></script>
 </body>
 </html>

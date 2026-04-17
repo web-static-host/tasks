@@ -19,7 +19,10 @@ window.renderTaskRowHTML = function(t) {
     else if (s.includes('ожидание') || s === 'не отвечает') badgeClass = 'bg-warning text-dark';
     else if (s === 'перенесен') badgeClass = 'bg-primary';
 
-    const canEdit = (t.manager === currentUser.name) || (t.specialist === currentUser.name);
+    const canEdit = (t.manager === currentUser.name) || 
+                    (t.specialist === currentUser.name) || 
+                    currentUser.role === 'admin' || 
+                    currentUser.role === 'director';
 
     let statusHTML = `
         <div class="dropdown">
@@ -77,7 +80,18 @@ window.renderTaskRowHTML = function(t) {
             <td><span class="badge border text-dark bg-light" style="font-size: 0.75rem;">${t.category || '-'}</span></td> 
             <td class="cell-task-name">${t.task_name}</td>
             <td><small class="text-muted">${t.inn || '-'}</small></td>
-            <td>${t.bitrix_url ? `<a href="${t.bitrix_url}" target="_blank" class="btn btn-sm btn-link p-0" onclick="window.handleBitrixClick(${t.id}, '${t.status}')">Открыть</a>` : '-'}</td>
+            <td>
+                ${t.bitrix_url && t.bitrix_url !== '-' ? `
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="${t.bitrix_url}" target="_blank" class="text-decoration-none" onclick="window.handleBitrixClick(${t.id}, '${t.status}')">Открыть</a>
+                        <button class="btn btn-sm p-0 border-0 text-secondary shadow-none" onclick="window.copyBitrixLink(${t.id}, '${t.bitrix_url}', '${t.status}')" title="Копировать ссылку">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z"/>
+                            </svg>
+                        </button>
+                    </div>
+                ` : '-'}
+            </td>
             <td class="cell-datetime" id="cell-datetime-${t.id}" style="${isGrayStatus ? 'color: #adb5bd; opacity: 0.6;' : ''}">${displayDate} | <strong>${displayTime}</strong></td>
             ${isPaid ? `<td class="cell-comment" style="max-width: 180px;"><small class="text-dark">${t.comment || ''}</small></td>` : ''}
             <td class="cell-price">${t.price ? t.price + ' ₽' : '—'}</td>
@@ -95,7 +109,7 @@ window.renderTaskRowHTML = function(t) {
                         <button class="btn-action btn-delete" onclick="window.deleteTask(${t.id})" title="Удалить">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:18px;"><path d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
                         </button>
-                        ${currentUser.role === 'manager' ? `
+                        ${(currentUser.role === 'manager' || currentUser.role === 'admin' || currentUser.role === 'director') ? `
                         <button class="btn-action btn-copy" onclick="window.copyTask(${t.id})" title="Копировать">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;"><rect x="9" y="9" width="12" height="12" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path><line x1="15" y1="12" x2="15" y2="18"></line><line x1="12" y1="15" x2="18" y2="15"></line></svg>
                         </button>` : ''}
@@ -210,7 +224,7 @@ function renderTaskList(tasks, isFirstStep = false) {
     const totalCols = currentTable === 'tasks' ? 12 : 11;
 
     const hasToday = tasks.some(t => (t.date || (t.created_at ? t.created_at.split('T')[0] : '')) === todayStr);
-    if (isFirstStep && !hasToday) {
+    if (isFirstStep && !hasToday && currentTable !== 'free_tasks') {
         tasks.push({ date: todayStr, isEmptyPlaceholder: true });
     }
 
@@ -226,7 +240,7 @@ function renderTaskList(tasks, isFirstStep = false) {
         let lastDate = null;
         tasks.forEach(t => {
             const taskDate = t.date || (t.created_at ? t.created_at.split('T')[0] : '');
-            if (taskDate !== lastDate) {
+            if (currentTable !== 'free_tasks' && taskDate !== lastDate) {
                 list.insertAdjacentHTML('beforeend', renderDayHeader(taskDate, todayStr, totalCols));
                 lastDate = taskDate;
             }
@@ -356,6 +370,16 @@ async function loadRemainingTasks(exclStart, exclEnd) {
 
 function scrollToToday() {
     const container = document.querySelector('.table-responsive');
+    if (!container) return;
+
+    // Ищем распорку сразу
+    const spacer = container.querySelector('#scroll-spacer');
+
+    // ЕСЛИ ЭТО БЕСПЛАТНЫЕ — полностью удаляем распорку и выходим
+    if (typeof currentTable !== 'undefined' && currentTable === 'free_tasks') {
+        if (spacer) spacer.remove();
+        return; 
+    }
     const table = container ? container.querySelector('table') : null;
     const dayHeaders = document.querySelectorAll('.day-header');
     const todayStr = new Date().toISOString().split('T')[0];
@@ -574,7 +598,7 @@ function insertTaskIntoDOM(t) {
     const activeTech = activeTechFilter; 
     const dateFilter = localStorage.getItem('dateFilter') || 'all';
     const nowStr = new Date().toISOString().split('T')[0];
-
+    
     if (activeTech !== 'all' && t.specialist !== activeTech) return;
     if (dateFilter === 'today' && t.date !== nowStr) return;
 
@@ -583,6 +607,11 @@ function insertTaskIntoDOM(t) {
 
     const targetDate = t.date || (t.created_at ? t.created_at.split('T')[0] : '');
     const rowHtml = renderTaskRowHTML(t); 
+
+    if (currentTable === 'free_tasks') {
+        list.insertAdjacentHTML('afterbegin', rowHtml);
+        return;
+    }
 
     // 2. Ищем или создаем заголовок даты
     let dateHeader = list.querySelector(`tr.day-header[data-date="${targetDate}"]`);
@@ -611,12 +640,17 @@ function insertTaskIntoDOM(t) {
 
     // 3. Вставляем задачу ВНУТРИ секции даты по времени
     let sibling = dateHeader.nextElementSibling;
-    const newTime = t.time ? t.time.substring(0, 5) : "00:00";
+    
+    // --- ИСПРАВЛЕНИЕ: Нормализация времени для вставки ---
+    const isLongBlock = (t.category === 'Отсутствует' && t.duration >= 480);
+    const newTime = isLongBlock ? "00:00" : (t.time ? t.time.substring(0, 5) : "00:00");
 
     while (sibling && !sibling.classList.contains('day-header')) {
         if (sibling.classList.contains('task-row')) {
             const rowTimeCell = sibling.querySelector('.cell-datetime strong');
-            const rowTime = rowTimeCell ? rowTimeCell.innerText : "00:00";
+            let rowTime = rowTimeCell ? rowTimeCell.innerText : "00:00";
+            if (rowTime === "ВЕСЬ ДЕНЬ") rowTime = "00:00"; // Приравниваем визуал "ВЕСЬ ДЕНЬ" к 00:00
+
             if (rowTime > newTime) {
                 sibling.insertAdjacentHTML('beforebegin', rowHtml);
                 return;
