@@ -150,3 +150,144 @@ const flatpickrConfig = {
 };
 
 document.getElementById('specialist')?.addEventListener('change', () => updateFreeSlots());
+
+window.openAvailabilityModal = async function(isViewOnly = false) {
+    const taskName = document.getElementById('taskName')?.value;
+    
+    // 1. Фильтруем спецов
+    let allowedSpecs = CONFIG.USERS.filter(u => u.role === 'specialist' || u.role === 'specialist_1c');
+    
+    // Если мы внутри создания задачи - фильтруем по скиллам, иначе показываем всех
+    if (!isViewOnly && taskName && window.taskCatalog && window.specialistSkills) {
+        const t = window.taskCatalog.find(x => x.task_name === taskName);
+        if (t) {
+            const specIds = window.specialistSkills.filter(s => s.task_id === t.id).map(s => s.user_id);
+            allowedSpecs = allowedSpecs.filter(u => specIds.includes(u.id));
+        }
+    }
+
+    const container = document.getElementById('availability-grid-container');
+    container.innerHTML = '<div class="p-5 text-center text-muted">Загрузка расписания...</div>';
+    
+    // Меняем заголовок модалки в зависимости от того, откуда она вызвана
+    const modalTitle = document.querySelector('#availabilityModal .modal-title');
+    if (modalTitle) modalTitle.innerText = isViewOnly ? 'Общая занятость команды' : 'Выбор времени специалиста';
+
+    new bootstrap.Modal(document.getElementById('availabilityModal')).show();
+
+    // 2. Генерируем даты ЖЕСТКО по локальному времени компьютера пользователя
+    const dates = [];
+    const now = new Date();
+    for(let i=0; i<7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        dates.push(`${year}-${month}-${day}`);
+    }
+
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    const todayStr = dates[0]; 
+
+    // 3. Качаем занятые задачи
+    const specNames = allowedSpecs.map(s => s.name);
+    const { data: busyTasks } = await supabase.from('tasks')
+        .select('specialist, date, time, duration, status')
+        .in('specialist', specNames)
+        .in('date', dates)
+        .not('status', 'in', '("Выполнено","Возврат","Не отвечает")');
+
+    // 4. Отрисовка
+    let html = '<div class="avail-container">';
+    
+    dates.forEach(date => {
+        const dObj = new Date(date);
+        const dayLabel = dObj.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+        const isToday = (date === todayStr);
+        
+        html += `
+            <div class="avail-day-group">
+                <div class="avail-day-header">${dayLabel}</div>
+                <div class="avail-specs-row">`;
+
+        allowedSpecs.forEach(spec => {
+            const settings = CONFIG.SPECIALISTS[spec.name];
+            if (!settings) return;
+
+            const isFriday = dObj.getDay() === 5;
+            const endStr = (isFriday && settings.friday_end) ? settings.friday_end : settings.end;
+            
+            const current = new Date(`1970-01-01T${settings.start}:00`);
+            const end = new Date(`1970-01-01T${endStr}:00`);
+            const lunchStart = new Date(`1970-01-01T${settings.lunch.start}:00`);
+            const lunchEnd = new Date(`1970-01-01T${settings.lunch.end}:00`);
+            const interval = settings.slot_interval || 30;
+
+            const specBusy = (busyTasks || []).filter(bt => bt.specialist === spec.name && bt.date === date);
+            
+            html += `<div class="avail-spec-col">
+                        <div class="avail-spec-name text-truncate">${spec.name.split(' ')[0]}</div>`;
+
+            while (current < end) {
+                const h = current.getHours();
+                const m = current.getMinutes();
+                const slot = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                const slotStart = h * 60 + m;
+
+                const isLunch = current >= lunchStart && current < lunchEnd;
+                const isPast = isToday && (currentMins > slotStart + 10);
+                
+                const isBusy = specBusy.some(bt => {
+                    if (!bt.time) return false;
+                    const [bH, bM] = bt.time.substring(0,5).split(':').map(Number);
+                    const bStart = bH * 60 + bM;
+                    const bEnd = bStart + (bt.duration || 30);
+                    return slotStart >= bStart && slotStart < bEnd;
+                });
+
+                if (isPast) {
+                    html += `<div class="avail-slot past" title="Время вышло">${slot}</div>`;
+                } else if (isLunch) {
+                    html += `<div class="avail-slot busy" title="Обед">${slot}</div>`;
+                } else if (isBusy) {
+                    html += `<div class="avail-slot busy" title="Занят">${slot}</div>`;
+                } else {
+                    if (isViewOnly) {
+                        // В режиме просмотра слоты просто серые/зеленые, но без наведения и курсора
+                        html += `<div class="avail-slot free" style="cursor: default; opacity: 0.9;">${slot}</div>`;
+                    } else {
+                        html += `<div class="avail-slot free" onclick="selectSlotFromGrid('${date}', '${slot}', '${spec.name}')">${slot}</div>`;
+                    }
+                }
+
+                current.setMinutes(current.getMinutes() + interval);
+            }
+            
+            html += `</div>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+};
+
+window.selectSlotFromGrid = function(date, time, specName) {
+    const dateInput = document.getElementById('date');
+    const specSelect = document.getElementById('specialist');
+    const timeSelect = document.getElementById('time');
+
+    if (dateInput && dateInput._flatpickr) dateInput._flatpickr.setDate(date);
+    if (specSelect) specSelect.value = specName;
+    
+    // Триггер обновления слотов времени для синхронизации
+    if (typeof updateFreeSlots === 'function') {
+        updateFreeSlots(time).then(() => {
+            if (timeSelect) timeSelect.value = time;
+        });
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('availabilityModal')).hide();
+};

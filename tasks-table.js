@@ -73,9 +73,12 @@ window.renderTaskRowHTML = function(t) {
         </div>`;
 
     let html = `
-        <tr id="task-row-${t.id}" class="task-row" data-duration="${t.duration || 30}">
-            <td><b class="text-primary">#${t.id}</b></td>
-            <td><small class="text-muted">${t.dept || '-'}</small></td> 
+        <tr id="task-row-${t.id}" class="task-row" data-duration="${t.duration || 30}" data-chain="${t.chain_id || ''}">
+            <td class="cell-id">
+                ${t.chain_id ? '<div class="chain-indicator"></div>' : ''}
+                <b class="text-primary">#${t.id}</b>
+            </td>
+            <td><small class="text-muted">${t.dept || '-'}</small></td>
             <td><small class="text-muted">${t.manager || '-'}</small></td>
             <td><span class="badge border text-dark bg-light" style="font-size: 0.75rem;">${t.category || '-'}</span></td> 
             <td class="cell-task-name">${t.task_name}</td>
@@ -127,8 +130,11 @@ window.renderTaskRowHTML = function(t) {
         nextDate.setHours(h, m + spent, 0, 0);
         const nextTime = `${String(nextDate.getHours()).padStart(2, '0')}:${String(nextDate.getMinutes()).padStart(2, '0')}`;
         html += `
-            <tr class="phantom-${t.id}" style="background-color: rgba(0,0,0,0.02); color: #999; border-left: 3px solid #dee2e6;">
-                <td></td>${showDept ? '<td></td>' : ''}<td></td><td></td>
+            <tr class="phantom-${t.id}" data-chain="${t.chain_id || ''}" style="background-color: rgba(0,0,0,0.02); color: #999;">
+                <td class="cell-id">
+                    ${t.chain_id ? '<div class="chain-indicator"></div>' : ''}
+                </td>
+                ${showDept ? '<td></td>' : ''}<td></td><td></td>
                 <td colspan="3" class="text-center" style="font-size: 0.8rem; font-style: italic;">↳ Продолжение задачи #${t.id}</td>
                 <td class="cell-datetime">${displayDate} | <strong>${nextTime}</strong></td>
                 ${isPaid ? '<td></td>' : ''}<td></td>
@@ -178,10 +184,13 @@ async function loadTasks() {
 
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
-    const yest = new Date(now); yest.setDate(now.getDate() - 1);
-    const yesterdayStr = yest.toISOString().split('T')[0];
-    const tom = new Date(now); tom.setDate(now.getDate() + 1);
-    const tomorrowStr = tom.toISOString().split('T')[0];
+    
+    // Формируем рамки для 5 дней: Позавчера (-2) и Послезавтра (+2)
+    const pastDate = new Date(now); pastDate.setDate(now.getDate() - 2);
+    const pastDateStr = pastDate.toISOString().split('T')[0];
+    
+    const futureDate = new Date(now); futureDate.setDate(now.getDate() + 2);
+    const futureDateStr = futureDate.toISOString().split('T')[0];
 
     try {
         let query = supabase.from(currentTable).select('*');
@@ -192,7 +201,8 @@ async function loadTasks() {
         }
 
         if (isPaid && dateFilter === 'all') {
-            query = query.gte('date', todayStr).lte('date', tomorrowStr);
+            // Загружаем 5 дней сразу (от позавчера до послезавтра)
+            query = query.gte('date', pastDateStr).lte('date', futureDateStr);
         } else if (dateFilter === 'today') {
             query = query.eq('date', todayStr);
         }
@@ -207,7 +217,8 @@ async function loadTasks() {
         renderTaskList(quickTasks, true); 
 
         if (isPaid && dateFilter === 'all') {
-            loadRemainingTasks(todayStr, tomorrowStr);
+            // Передаем новые рамки в фоновую загрузку (чтобы исключить эти 5 дней из подгрузки)
+            loadRemainingTasks(pastDateStr, futureDateStr);
         }
 
     } catch (e) { 
@@ -324,7 +335,12 @@ function renderTaskList(tasks, isFirstStep = false) {
             });
             list.insertAdjacentHTML('beforeend', futureHtml);
         }
+        if (typeof window.updateChainVisuals === 'function') {
+            window.updateChainVisuals();
+        }
+        
     }
+    
 }
 
 // Вспомогательная для заголовка
@@ -350,7 +366,7 @@ async function loadRemainingTasks(exclStart, exclEnd) {
             query = query.eq('specialist', activeTech);
         }
 
-        // Исключаем уже загруженные 3 дня
+        // Исключаем уже загруженные 5 дней
         query = query.or(`date.lt.${exclStart},date.gt.${exclEnd}`);
 
         const { data: allTasks } = await query
@@ -360,7 +376,6 @@ async function loadRemainingTasks(exclStart, exclEnd) {
         if (allTasks) {
             renderTaskList(allTasks, false);
             isFullHistoryLoaded = true;
-            console.log("✅ Остальные данные догружены в фоне");
         }
     } catch (e) {
         console.error("Ошибка фоновой загрузки:", e);
@@ -537,6 +552,9 @@ const handleRealtimeChange = (payload) => {
         const row = document.getElementById(`task-row-${payload.old.id}`);
         if (row) row.remove();
         document.querySelectorAll(`.phantom-${payload.old.id}`).forEach(el => el.remove());
+        if (typeof window.updateChainVisuals === 'function') {
+            window.updateChainVisuals();
+        }
     }
 };
 
@@ -665,6 +683,9 @@ function insertTaskIntoDOM(t) {
     } else {
         list.insertAdjacentHTML('beforeend', rowHtml);
     }
+    if (typeof window.updateChainVisuals === 'function') {
+        window.updateChainVisuals();
+    }
 }
 
 // Вспомогательная функция для цветов (чтобы не дублировать в основном коде)
@@ -678,3 +699,61 @@ function getBadgeClass(status) {
     if (s === 'перенесен') return 'bg-primary';
     return 'bg-secondary';
 }
+
+window.updateChainVisuals = function() {
+    const rows = document.querySelectorAll('tr[data-chain]');
+    const chainMap = {};
+    const chainOrder = []; // Массив для сохранения физического порядка цепочек сверху вниз
+
+    // 1. Группируем строки, запоминая порядок их появления
+    rows.forEach(row => {
+        const chainId = row.getAttribute('data-chain');
+        if (chainId && chainId !== 'null' && chainId !== 'undefined') {
+            if (!chainMap[chainId]) {
+                chainMap[chainId] = [];
+                chainOrder.push(chainId); // Записываем ID новой цепочки
+            }
+            chainMap[chainId].push(row);
+        }
+    });
+
+    const palette = ['#4285F4', '#9C27B0', '#0F9D58', '#E67C73', '#F4B400', '#00BCD4'];
+    let prevColorIndex = -1; // Память о цвете предыдущей цепочки
+
+    // 2. Раздаем классы скобок и цвета
+    chainOrder.forEach(chainId => {
+        const chainRows = chainMap[chainId];
+        
+        // Вычисляем базовый цвет по хэшу
+        let hash = 0;
+        for (let i = 0; i < chainId.length; i++) hash += chainId.charCodeAt(i);
+        let colorIndex = hash % palette.length;
+
+        // ЗАЩИТА: Если цвет совпадает с предыдущей цепочкой — принудительно берем следующий цвет!
+        if (colorIndex === prevColorIndex) {
+            colorIndex = (colorIndex + 1) % palette.length;
+        }
+        
+        const color = palette[colorIndex];
+        prevColorIndex = colorIndex; // Сохраняем цвет для проверки следующей цепочки
+
+        chainRows.forEach((row, i) => {
+            row.classList.remove('chain-start', 'chain-middle', 'chain-end', 'chain-single');
+
+            if (chainRows.length === 1) {
+                row.classList.add('chain-single');
+            } else if (i === 0) {
+                row.classList.add('chain-start');
+            } else if (i === chainRows.length - 1) {
+                row.classList.add('chain-end');
+            } else {
+                row.classList.add('chain-middle');
+            }
+
+            const indicator = row.querySelector('.chain-indicator');
+            if (indicator) {
+                indicator.style.borderColor = color;
+            }
+        });
+    });
+};

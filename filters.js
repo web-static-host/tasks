@@ -126,6 +126,7 @@ function setupInterface() {
     
     const userInfo = document.getElementById('user-info');
     const adminLink = document.getElementById('admin-link');
+    const reportsLink = document.getElementById('reports-link');
     const addTaskContainer = document.getElementById('add-task-btn-container'); 
     const busyBtn = document.getElementById('busy-task-btn');
     const techContainer = document.getElementById('tech-filters-container');
@@ -142,6 +143,11 @@ function setupInterface() {
         } else {
             adminLink.classList.add('d-none'); 
         }
+    }
+
+    if (reportsLink) {
+        if (currentUser.role !== 'manager') reportsLink.classList.remove('d-none');
+        else reportsLink.classList.add('d-none');
     }
 
     // --- ЛОГИКА КНОПОК ДЕЙСТВИЙ ---
@@ -193,5 +199,26 @@ function setupInterface() {
                  onclick="setTechFilter('${tech.name}', this)">${tech.name}</button>`
             );
         });
+        const flexContainer = techFilters.parentElement;
+        flexContainer.classList.add('w-100');
+
+        // Удаляем старую кнопку занятости (чтобы не плодить дубли при перерисовках)
+        const existingBtn = document.getElementById('global-availability-btn');
+        if (existingBtn) existingBtn.remove();
+
+        // Добавляем красивую светлую кнопку справа
+        flexContainer.insertAdjacentHTML('beforeend', `
+            <button id="global-availability-btn" type="button" class="btn btn-sm border shadow-sm ms-auto d-flex align-items-center gap-2 text-dark" 
+                    style="background-color: #ffffff; border-radius: 15px; font-weight: 600; transition: all 0.2s;" 
+                    onmouseover="this.style.backgroundColor='#f1f3f5';" 
+                    onmouseout="this.style.backgroundColor='#ffffff';"
+                    onclick="openAvailabilityModal(true)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-top: -1px;">
+                    <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                    <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z"/>
+                </svg>
+                Занятость
+            </button>
+        `);
     }
 }

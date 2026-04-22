@@ -505,3 +505,175 @@ html, body {
     overflow-anchor: none !important;
 }
 
+/* Стили сетки занятости */
+.avail-container {
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+}
+
+.avail-day-group {
+    border-bottom: 2px solid #dee2e6;
+    background: #fff;
+}
+
+.avail-day-header {
+    background: #e9ecef;
+    padding: 8px 15px;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.avail-specs-row {
+    display: flex;
+    overflow-x: auto;
+    padding: 10px;
+    gap: 10px;
+}
+
+.avail-spec-col {
+    flex: 0 0 160px; /* Фиксированная ширина колонки спеца */
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.avail-spec-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-align: center;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 5px;
+}
+
+.avail-slot {
+    font-size: 0.75rem;
+    padding: 4px;
+    margin-bottom: 4px;
+    text-align: center;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.avail-slot.free {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+.avail-slot.free:hover {
+    background: #2e7d32;
+    color: #fff;
+}
+
+.avail-slot.busy {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.avail-slot.lunch {
+    background: #fff3e0;
+    color: #ef6c00;
+    border: 1px dashed #ffe0b2;
+}
+
+.avail-slot.past {
+    background: #f1f3f5;
+    color: #adb5bd;
+    border: 1px solid #e9ecef;
+    cursor: not-allowed;
+}
+
+/* === ЦЕПОЧКИ ЗАДАЧ === */
+
+.chain-line {
+    position: absolute;
+    left: 0;
+    top: -1px; /* Накладываем на границы строк для непрерывности */
+    bottom: -1px;
+    width: 3px;
+    background-color: #8bb9fe; /* Мягкий синий цвет */
+    z-index: 1;
+}
+
+/* Свернутая карточка задачи в модалке (для Этапа 2) */
+.task-chain-summary {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-left: 4px solid #0d6efd;
+    border-radius: 8px;
+    padding: 10px 15px;
+    margin-bottom: 12px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.task-chain-summary:hover {
+    background: #f1f3f5;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.chain-copy-btn {
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    margin-left: 5px;
+    cursor: pointer;
+}
+
+/* === ЦЕПОЧКИ ЗАДАЧ (СКОБКИ) === */
+/* === ЦЕПОЧКИ ЗАДАЧ (СКОБКИ) === */
+.cell-id {
+    position: relative;
+    padding-left: 12px !important; /* Даем место для скобки */
+}
+
+.chain-indicator {
+    position: absolute;
+    left: 0;
+    width: 10px; /* Длина горизонтальной ножки */
+    z-index: 1;
+    border: 0 solid transparent;
+}
+
+/* Первая задача в цепочке: верхняя скобка ┌ */
+tr.chain-start .chain-indicator {
+    top: -1px;    /* Начинаем от самой верхней границы ячейки */
+    bottom: -1px; /* Тянем до самого низа */
+    border-left-width: 3px;
+    border-top-width: 3px;
+    border-radius: 0; /* Строгие прямые углы */
+}
+
+/* Задача в середине цепочки: прямая линия │ */
+tr.chain-middle .chain-indicator {
+    top: -1px;
+    bottom: -1px;
+    border-left-width: 3px;
+}
+
+/* Последняя задача в цепочке: нижняя скобка └ */
+tr.chain-end .chain-indicator {
+    top: -1px;
+    bottom: -1px; /* Тянем до самого низа */
+    border-left-width: 3px;
+    border-bottom-width: 3px;
+    border-radius: 0; /* Строгие прямые углы */
+}
+
+/* Если в цепочке видна только одна задача */
+tr.chain-single .chain-indicator {
+    top: -1px;
+    bottom: -1px;
+    border-left-width: 3px;
+    border-top-width: 3px;
+    border-bottom-width: 3px;
+    border-radius: 0;
+}

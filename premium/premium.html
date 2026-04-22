@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отчеты — Технический портал</title>
+    <link rel="icon" type="image/png" href="../icon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="premium-style.css">
+</head>
+<body class="bg-light">
+    <div id="reports-screen" class="container-fluid p-3 p-md-4">
+        <div class="row g-4">
+            
+            <div class="col-md-3 col-lg-2">
+                <div class="sticky-top" style="top: 20px;">
+                    <div class="d-flex align-items-center mb-3 px-2">
+                        <button onclick="location.href='../index.html'" class="btn btn-link text-dark p-0 me-2 shadow-none" title="Назад к задачам" style="transition: transform 0.2s;">
+                            <svg width="22" height="22" fill="currentColor" viewBox="0 0 16 16" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+                            </svg>
+                        </button>
+                        <h2 class="h5 mb-0 fw-bold">Аналитика</h2>
+                    </div>
+                    
+                    <div class="list-group shadow-sm border-0">
+                        <button class="list-group-item list-group-item-action active" data-bs-toggle="pill" data-bs-target="#tab-premium">
+                            Подсчет премии
+                        </button>
+                        </div>
+                </div>
+            </div>
+
+            <div class="col-md-9 col-lg-10">
+                <div class="tab-content bg-white p-4 shadow-sm reports-main-panel">
+                    
+                    <div class="tab-pane fade show active h-100" id="tab-premium">
+                        <div class="d-flex flex-column h-100">
+                            <div class="d-flex justify-content-between align-items-end mb-4 pb-3 border-bottom flex-shrink-0">
+                                <div>
+                                    <h5 class="mb-1 fw-bold">Подсчет премии (Технические специалисты)</h5>
+                                    <small class="text-muted">Учитываются только задачи в статусе «Выполнено»</small>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <select id="report-specialist" class="form-select form-select-sm" style="width: 200px;">
+                                        <option value="all">Все специалисты</option>
+                                        </select>
+                                    <input type="month" id="report-month" class="form-control form-control-sm" style="width: 150px;">
+                                    <button class="btn btn-primary btn-sm px-3" onclick="calculatePremium()">Посчитать</button>
+                                </div>
+                            </div>
+                            
+                            <div id="premium-results" class="flex-grow-1 custom-scrollbar">
+                                <div class="text-center py-5 text-muted">Выберите месяц и нажмите «Посчитать»</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold" id="detailsModalLabel">Детализация задач</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="details-table-container"></div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../config.js"></script>
+    <script src="premium.js"></script>
+</body>
+</html>
