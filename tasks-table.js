@@ -559,6 +559,7 @@ const handleRealtimeChange = (payload) => {
 };
 
 // Подписываемся сразу на ДВЕ таблицы в одном канале
+
 const taskSubscription = supabase
     .channel('all-tasks-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, handleRealtimeChange)

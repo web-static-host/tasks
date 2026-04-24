@@ -69,26 +69,44 @@ document.addEventListener('submit', async (e) => {
             }
         } else {
             // СОЗДАНИЕ (одиночное или цепочка)
-            const chainId = window.taskChain.length > 0 ? crypto.randomUUID() : null;
-            
-            // Собираем всё в один массив
-            if (chainId) {
-                window.taskChain.forEach(t => {
-                    const { billing_type, ...safeTask } = t; // ВЫРЕЗАЕМ billing_type, чтобы не было ошибки 400
-                    tasksToSave.push({ ...safeTask, chain_id: chainId, manager: currentUser.name, dept: currentUser.dept, status: 'Новая' });
-                });
+            // 1. Принудительно сохраняем то, что прямо сейчас введено в форму
+            if (typeof window.taskChain !== 'undefined' && window.taskChain.length > 0) {
+                window.taskChain[window.activeChainIndex || 0] = taskData;
+                
+                // ПРОВЕРКА ЦЕПОЧКИ: Все ли свернутые задачи дозаполнены?
+                const invalidIndex = window.taskChain.findIndex(t => !t.task_name || !t.specialist || !t.inn || !t.date || !t.time);
+                if (invalidIndex !== -1 && window.taskChain.length > 1) {
+                    alert(`Невозможно сохранить: задача #${invalidIndex + 1} заполнена не полностью!\nРазверните её и заполните обязательные поля.`);
+                    btn.disabled = false;
+                    return; // Блокируем отправку в БД
+                }
             }
-            tasksToSave.push({ ...taskData, chain_id: chainId });
 
-            // Важно: Поля billing_type тут НЕТ, поэтому ошибки 400 не будет
+            // 2. Генерируем ID только если задач больше одной
+            const chainId = (window.taskChain && window.taskChain.length > 1) ? crypto.randomUUID() : null;
+            
+            // 3. Собираем всё из памяти в финальный массив
+            if (typeof window.taskChain !== 'undefined' && window.taskChain.length > 0) {
+                window.taskChain.forEach(t => {
+                    const { billing_type, ...safeTask } = t; 
+                    // Защита: сохраняем только задачи с названием
+                    if (safeTask.task_name) {
+                        tasksToSave.push({ ...safeTask, chain_id: chainId, manager: currentUser.name, dept: currentUser.dept, status: 'Новая' });
+                    }
+                });
+            } else {
+                // Страховка для одиночной задачи
+                tasksToSave.push({ ...taskData, chain_id: chainId, manager: currentUser.name, dept: currentUser.dept, status: 'Новая' });
+            }
+
             const { data: savedTasks, error } = await supabase.from(targetTable).insert(tasksToSave).select();
 
             if (!error) {
-                // Пишем в историю для каждой сохраненной задачи
                 for (const t of savedTasks) {
                     await logTaskAction(t.id, 'create', null, chainId ? "Создано в цепочке" : taskData.comment);
                 }
-                window.taskChain = []; // Очищаем цепочку
+                window.taskChain = [];
+                window.activeChainIndex = 0;
                 
                 const modalEl = document.getElementById('taskModal');
                 if (modalEl) {
@@ -96,7 +114,6 @@ document.addEventListener('submit', async (e) => {
                     if (inst) inst.hide();
                 }
                 
-                // Жестко убираем зависший темный фон
                 setTimeout(() => {
                     document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
                     document.body.classList.remove('modal-open');
