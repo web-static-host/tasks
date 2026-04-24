@@ -1,6 +1,6 @@
 
 const CONFIG = {
-    SUPABASE_URL: 'http://213.171.29.161',
+    SUPABASE_URL: 'https://tasks.zapto.org',
     SUPABASE_KEY: 'sb_publishable_KRIlHh6op0I-JuNSsRLQQQ_2XSzICXq',
     
     USERS: [],
