@@ -21,7 +21,8 @@ function applySavedFiltersVisuals() {
     
     // Если была своя дата, подставляем её
     if (savedDateFilter === 'custom' && customDate) {
-        // Здесь можно тоже хранить значение даты в кэше, если нужно
+        const savedCustom = localStorage.getItem('customDateVal');
+        if (savedCustom) customDate.value = savedCustom;
     }
 }
 
@@ -66,10 +67,25 @@ window.setTechFilter = (techName, btn) => {
 
 function initFilters() {
     const allUsers = CONFIG.USERS || [];
-    if (!window.activeTechFilter && CONFIG.USERS && CONFIG.USERS.length > 0) {
-    const firstTech = CONFIG.USERS.find(u => u.role === 'specialist');
-    if (firstTech) window.activeTechFilter = firstTech.name;
+    
+    // === НОВОЕ: УМНЫЙ ВЫБОР ФИЛЬТРА ПО УМОЛЧАНИЮ ===
+    if (!window.activeTechFilter && currentUser) {
+        let specialists = allUsers.filter(u => u.role === 'specialist');
+        
+        if (specialists.length > 0) {
+            // Делаем ту же сортировку, что и для кнопок: сам юзер первый, остальные по алфавиту
+            specialists.sort((a, b) => {
+                if (a.name === currentUser.name) return -1;
+                if (b.name === currentUser.name) return 1;
+                return a.name.localeCompare(b.name);
+            });
+            window.activeTechFilter = specialists[0].name;
+        }
+        
+        localStorage.setItem('activeTechFilter', window.activeTechFilter || '');
     }
+    // ===============================================
+
     const hideDone = document.getElementById('hideDone');
     const onlyMyTasks = document.getElementById('onlyMyTasks');
     const dateRadios = document.querySelectorAll('input[name="filterDate"]');
@@ -96,17 +112,41 @@ function initFilters() {
 
     dateRadios.forEach(r => r.addEventListener('change', (e) => {
         localStorage.setItem('dateFilter', e.target.value);
-        customDate.value = ''; 
+        if (customDate) {
+            if (customDate._flatpickr) {
+                customDate._flatpickr.clear(false); // Очищаем без триггера onChange
+            } else {
+                customDate.value = '';
+            }
+        }
+        localStorage.removeItem('customDateVal');
         loadTasks();
     }));
 
-    customDate.addEventListener('change', () => {
-        if (customDate.value) {
-            localStorage.setItem('dateFilter', 'custom');
-            dateRadios.forEach(r => r.checked = false);
-            loadTasks();
+    if (customDate) {
+        flatpickr(customDate, {
+            locale: "ru",
+            dateFormat: "Y-m-d",
+            altInput: true,
+            altFormat: "d.m.Y",
+            allowInput: true, // Разрешаем ввод руками с клавиатуры
+            altInputClass: "filter-segment-date", // МАГИЯ: принудительно заставляем его быть круглым!
+            onChange: function(selectedDates, dateStr) {
+                if (dateStr) {
+                    localStorage.setItem('dateFilter', 'custom');
+                    localStorage.setItem('customDateVal', dateStr); // Сохраняем дату!
+                    dateRadios.forEach(r => r.checked = false);
+                    if (typeof loadTasks === 'function') loadTasks();
+                }
+            }
+        });
+        
+        // Подтягиваем значение при загрузке страницы
+        const savedVal = localStorage.getItem('customDateVal');
+        if (savedVal && localStorage.getItem('dateFilter') === 'custom') {
+            customDate._flatpickr.setDate(savedVal, false);
         }
-    });
+    }
 
     if (taskSearch) {
         taskSearch.addEventListener('input', () => loadTasks());
@@ -178,7 +218,7 @@ function setupInterface() {
         if (currentUser.role === 'specialist') {
             onlyMyTasksContainer.style.setProperty('display', 'none', 'important');
         } else {
-            onlyMyTasksContainer.style.setProperty('display', 'inline-block', 'important');
+            onlyMyTasksContainer.style.setProperty('display', 'inline-flex', 'important');
         }
     }
 
@@ -187,7 +227,14 @@ function setupInterface() {
         techContainer.classList.remove('d-none');
         techFilters.innerHTML = ''; 
 
-        const specialists = (CONFIG.USERS || []).filter(u => u.role === 'specialist');
+        let specialists = (CONFIG.USERS || []).filter(u => u.role === 'specialist');
+        
+        // === НОВОЕ: СОРТИРОВКА (Сам технарь всегда первый) ===
+        specialists.sort((a, b) => {
+            if (a.name === currentUser.name) return -1; // Ставим себя наверх
+            if (b.name === currentUser.name) return 1;
+            return a.name.localeCompare(b.name); // Остальных по алфавиту
+        });
         
         specialists.forEach(tech => {
             if (tech.name === currentUser.name && !activeTechFilter) {

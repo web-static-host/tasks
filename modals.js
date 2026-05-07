@@ -58,6 +58,16 @@ window.openDynamicModal = function(type, isEdit = false) {
 
     const timeCommentHtml = `
         <div id="dateTimeBlock" class="step mb-2">
+            <div id="chain-reschedule-mode-block" class="mb-2 d-none">
+                <label class="form-label fw-bold mb-1 small text-secondary">Режим переноса связанной задачи:</label>
+                <div class="btn-group w-100 shadow-sm" role="group">
+                    <input type="radio" class="btn-check" name="chainRescheduleMode" id="modeChain" value="chain" checked onchange="if(typeof updateFreeSlots === 'function') updateFreeSlots()">
+                    <label class="btn btn-outline-primary btn-sm fw-bold" for="modeChain" style="font-size: 0.8rem; padding: 6px 0;">Двигать всю цепочку</label>
+
+                    <input type="radio" class="btn-check" name="chainRescheduleMode" id="modeSingle" value="single" onchange="if(typeof updateFreeSlots === 'function') updateFreeSlots()">
+                    <label class="btn btn-outline-primary btn-sm fw-bold" for="modeSingle" style="font-size: 0.8rem; padding: 6px 0;">Только эту задачу</label>
+                </div>
+            </div>
             <div class="row g-2">
                 <div class="col-4">
                     <label class="form-label fw-bold mb-1 small">Дата</label>
@@ -92,7 +102,7 @@ window.openDynamicModal = function(type, isEdit = false) {
 
     let fieldsHtml = '';
     if (type === 'paid') { title = 'Платная задача'; fieldsHtml = `<div class="row g-3"><div class="col-md-6">${specCatTaskHtml(false)} ${clientHtml(false)}</div><div class="col-md-6">${timeCommentHtml}</div></div>`; }
-    else if (type === 'free') { title = 'Бесплатная задача'; fieldsHtml = `<div class="row g-3"><div class="col-md-12">${specCatTaskHtml(false)} ${clientHtml(true)}</div></div>`; }
+    else if (type === 'free') { title = 'Бесплатная задача'; fieldsHtml = `<div class="row g-3"><div class="col-md-12"><input type="hidden" id="date" value="${new Date().toISOString().split('T')[0]}">${specCatTaskHtml(false)} ${clientHtml(true)}<div id="commentBlock" class="mt-2"><label class="form-label fw-bold mb-1 small">Примечание</label><textarea class="form-control form-control-sm" id="taskComment" rows="2" maxlength="255" placeholder='Например: "Будет услуга по установке"'></textarea></div></div></div>`; }
     else if (type === 'demo') { title = 'Демонстрация'; fieldsHtml = `<div class="row g-3"><div class="col-md-6">${specCatTaskHtml(true)} ${clientHtml(true)}</div><div class="col-md-6">${timeCommentHtml}</div></div>`; }
 
     container.innerHTML = `
@@ -119,7 +129,7 @@ window.openDynamicModal = function(type, isEdit = false) {
 
                             <div class="mt-4 d-flex gap-2">
                                 <button type="submit" class="btn btn-success flex-grow-1 py-2 fw-bold shadow-sm" id="submit-btn">Сохранить</button>
-                                ${!isEdit && type !== 'free' ? `<button type="button" class="btn btn-outline-primary py-2 fw-bold shadow-sm" onclick="addTaskToChain()" id="add-to-chain-btn">+ Добавить связанную</button>` : ''}
+                               ${!isEdit ? `<button type="button" class="btn btn-outline-primary py-2 fw-bold shadow-sm" onclick="addTaskToChain()" id="add-to-chain-btn">+ Добавить связанную</button>` : ''}
                             </div>
                         </form>
 
@@ -136,6 +146,28 @@ window.openDynamicModal = function(type, isEdit = false) {
     if (!isEdit) {
         new bootstrap.Modal(document.getElementById('taskModal')).show();
         renderChainSummaries(); // Сразу рисуем, если есть что
+    } else if (isEdit && window.editChainId && window.taskChain.length > 1) {
+        // === НОВОЕ: Редактирование задачи из цепочки ===
+        // Модалка уже открывается через task-actions.js (там вызов new bootstrap.Modal...show())
+        // Здесь нам нужно только после того как форма заполнится — дорисовать остальные задачи цепочки
+
+        // Ждём пока task-actions заполнит форму текущей задачей (там тройной setTimeout ~150мс)
+        setTimeout(() => {
+            // Прячем блок "Причина изменения" — он не нужен для задач из цепочки
+            const logBlock = document.getElementById('changeLogBlock');
+            if (logBlock) logBlock.classList.add('d-none');
+
+            // Показываем переключатель режима переноса
+            const modeBlock = document.getElementById('chain-reschedule-mode-block');
+            if (modeBlock) modeBlock.classList.remove('d-none');
+
+            // Меняем заголовок кнопки сохранения
+            const submitBtn = document.getElementById('submit-btn');
+            if (submitBtn) submitBtn.innerText = 'Сохранить изменения';
+
+            // Рисуем все остальные задачи цепочки как свёрнутые карточки
+            renderChainSummaries();
+        }, 250);
     }
 };
 
@@ -234,20 +266,21 @@ window.renderChainSummaries = function() {
         if (index === window.activeChainIndex) return; // Текущую развернутую задачу не показываем в списке
 
         // Красная рамка и предупреждение, если свернутая задача не дозаполнена
-        const isValid = t.task_name && t.specialist && t.inn && t.date && t.time;
+        const taskType = document.getElementById('hiddenTaskType')?.value;
+        const isFreeChain = taskType === 'free';
+        const isValid = t.task_name && t.specialist && t.inn && t.date && (isFreeChain || t.time);
         const warningIcon = isValid ? '' : '<span class="text-danger fw-bold me-2" title="Не заполнено">⚠️</span>';
 
         const cardHtml = `
-        <div class="task-chain-summary d-flex justify-content-between align-items-center" style="border-left-color: ${isValid ? '#0d6efd' : '#dc3545'}; opacity: 0; animation: fadeIn 0.3s forwards;">
-            <div>
-                <span class="badge bg-primary me-2">#${index + 1}</span>
-                <span class="fw-bold">${t.task_name || 'Новая задача'}</span> 
-                <span class="text-muted mx-2 small">|</span>
-                <span class="small">ИНН: ${t.inn || '—'}</span>
-                <span class="text-muted mx-2 small">|</span>
-                <span class="small text-primary fw-bold">${t.time || '--:--'}</span>
+        <div class="task-chain-summary d-flex align-items-center justify-content-between" style="border-left-color: ${isValid ? '#0d6efd' : '#dc3545'}; opacity: 0; animation: fadeIn 0.3s forwards;">
+            <div class="d-flex flex-wrap align-items-center gap-1 flex-grow-1 me-2" style="min-width: 0; row-gap: 2px;">
+                <span class="badge bg-primary flex-shrink-0">#${index + 1}</span>
+                <span class="fw-bold" style="word-break: break-word;">${t.task_name || 'Новая задача'}</span>
+                <span class="text-muted small flex-shrink-0">|</span>
+                <span class="small flex-shrink-0" style="white-space: nowrap;">ИНН:&nbsp;${t.inn || '—'}</span>
+                ${!isFreeChain ? `<span class="text-muted small flex-shrink-0">|</span><span class="small text-primary fw-bold flex-shrink-0">${t.time || '--:--'}</span>` : ''}
             </div>
-            <div class="d-flex align-items-center">
+            <div class="d-flex align-items-center flex-shrink-0">
                 ${warningIcon}
                 <button type="button" class="btn btn-sm btn-outline-primary ms-auto me-3 d-flex align-items-center gap-1 shadow-sm" style="border-radius: 12px; font-size: 0.7rem; padding: 2px 10px;" onclick="expandTask(${index})">
                     Развернуть

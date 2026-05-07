@@ -7,12 +7,6 @@ const CONFIG = {
     SPECIALISTS: {},
 
     // Оставляем для обратной связи, если где-то используется напрямую
-    MANAGER: {
-        NAME: "Иванов Иван",
-        DEPT: "Отдел продаж"
-    },
-
-    
 
 };
 window.supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);

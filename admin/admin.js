@@ -107,6 +107,9 @@ function loadDataForTab(target) {
     else if (target === '#tab-history') {
         loadAdminHistory();
     }
+    else if (target === '#tab-calendar' && typeof loadAdminCalendar === 'function') {
+        loadAdminCalendar();
+    }
 }
 
 // --- 3. НАСТРОЙКИ ГРАФИКОВ ---

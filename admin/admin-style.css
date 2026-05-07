@@ -421,3 +421,105 @@
 .tech-group-title.type-paid { color: #28a745; }
 .tech-group-title.type-free { color: #0d6efd; }
 .tech-group-title.type-demo { color: #6f42c1; }
+
+/* ============== ПРОИЗВОДСТВЕННЫЙ КАЛЕНДАРЬ ============== */
+.cal-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    vertical-align: -1px;
+    margin-right: 4px;
+}
+
+.cal-month-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 8px 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    height: 200px;
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+}
+
+#calendar-months-grid {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-content: flex-start;
+}
+
+#calendar-months-grid .col-3 {
+    width: auto !important;
+    flex: none !important;
+    padding: 0 !important;
+}
+.cal-month-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 4px;
+    color: #212529;
+}
+
+.cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    font-size: 0.6rem;
+    color: #adb5bd;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 2px;
+}
+
+.cal-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: 1fr;
+    /* Резервируем место под 6 рядов чтобы все месяцы были одинаковы */
+    grid-template-rows: repeat(6, 1fr);
+    gap: 1px;
+    font-size: 0.72rem;
+    text-align: center;
+    flex-grow: 1;
+}
+
+.cal-day {
+    padding: 0;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cal-day:hover {
+    background: #f1f3f5 !important;
+    transform: scale(1.05);
+}
+
+.cal-day.cal-empty {
+    cursor: default;
+}
+
+.cal-day.cal-empty:hover {
+    background: transparent !important;
+    transform: none;
+}
+
+.cal-day.cal-holiday {
+    background: #fcdcdc;
+    color: #a02020;
+    font-weight: 600;
+}
+
+.cal-day.cal-short {
+    background: #ffe5c2;
+    color: #8a4a00;
+    font-weight: 600;
+}

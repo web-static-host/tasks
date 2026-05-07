@@ -1,5 +1,6 @@
 let techSpecialists = [];
 let detailedTasksStore = {};
+let headName = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     setDefaultMonth();
@@ -17,11 +18,11 @@ function setDefaultMonth() {
 }
 
 // Подгружаем только обычных тех спецов (role_id = 3)
+// Подгружаем спецов (3) и директора (5)
 async function loadSpecialists() {
-    // Подгружаем еще и display_name
     const { data, error } = await supabase.from('users')
         .select('id, full_name, display_name, user_roles!inner(role_id)')
-        .eq('user_roles.role_id', 3)
+        .in('user_roles.role_id', [3, 5]) // Берем и технарей, и director
         .eq('is_active', true)
         .order('full_name');
 
@@ -30,17 +31,38 @@ async function loadSpecialists() {
         return;
     }
     
-    // Клеим имена в точности так же, как они лежат в БД внутри самих задач
-    techSpecialists = (data || []).map(u => ({
-        id: u.id,
-        name: (u.display_name || u.full_name).trim()
-    }));
+    techSpecialists = [];
+    headName = null;
+
+    (data || []).forEach(u => {
+        const name = (u.display_name || u.full_name).trim();
+        techSpecialists.push({ id: u.id, name: name });
+        
+        // Безопасная проверка: Supabase может вернуть объект или массив
+        const roles = Array.isArray(u.user_roles) ? u.user_roles : [u.user_roles];
+        if (roles.some(r => r && r.role_id === 5)) {
+            headName = name; // Запоминаем босса
+        }
+    });
 
     const select = document.getElementById('report-specialist');
+    select.innerHTML = '';
     
-    techSpecialists.forEach(s => {
-        select.add(new Option(s.name, s.name)); // Теперь выводим правильное имя
-    });
+    // Безопасно достаем текущего юзера
+    const user = typeof currentUser !== 'undefined' ? currentUser : JSON.parse(localStorage.getItem('currentUser') || '{}');
+    
+    // --- ОГРАНИЧЕНИЕ ВИДИМОСТИ ---
+    if (user.role === 'specialist' || user.role === 'specialist_1c') {
+        // Обычный технарь видит только себя, список заблокирован
+        select.innerHTML = `<option value="${user.name}">${user.name}</option>`;
+        select.disabled = true;
+    } else {
+        // director или admin видят всех
+        select.innerHTML = '<option value="all">Все специалисты</option>';
+        techSpecialists.forEach(s => {
+            select.add(new Option(s.name, s.name));
+        });
+    }
 }
 
 // Главная функция подсчета
@@ -125,20 +147,36 @@ window.calculatePremium = async function() {
 
         // 4. Готовим объект-копилку
         let stats = {};
+        let totalDepartmentPaidSum = 0; // Копилка для 1% директора
+
         const initSpec = (name) => {
             const cleanName = name ? name.trim() : 'Неизвестно';
             if (!stats[cleanName]) stats[cleanName] = { paidSum: 0, demoCount: 0, freeCount: 0 };
             return cleanName;
         };
 
+        // ПРИНУДИТЕЛЬНО добавляем руководителя в список! 
+        // Даже если он не сделал ни одной личной задачи, он должен получить свой 1%
+        if (headName) {
+            initSpec(headName);
+        }
+
         // Раскидываем Платные/Демо
         (paidTasks || []).forEach(t => {
             const name = initSpec(t.specialist);
-            if (t.category === 'Демонстрация') stats[name].demoCount++;
-            else stats[name].paidSum += (Number(t.price) || 0);
+            if (t.category === 'Демонстрация') {
+                stats[name].demoCount++;
+            } else {
+                const price = Number(t.price) || 0;
+                stats[name].paidSum += price;
+                // В общую копилку отдела идут деньги всех, КРОМЕ личных задач директора
+                if (name !== headName) {
+                    totalDepartmentPaidSum += price;
+                }
+            }
         });
 
-        // Раскидываем валидные Бесплатные
+        // Раскидываем Бесплатные
         validFreeTasks.forEach(t => {
             const name = initSpec(t.specialist);
             stats[name].freeCount++;
@@ -148,13 +186,28 @@ window.calculatePremium = async function() {
         let html = '<div class="row g-4">';
         let totalSystemPremium = 0;
         let hasAnyData = false;
+        
+        detailedTasksStore = {}; 
+
+        const monthNames = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
+        const reportMonthText = `${monthNames[parseInt(month) - 1]} ${year}`;
 
         Object.keys(stats).forEach(name => {
             if (selectedSpec !== 'all' && name !== selectedSpec) return;
             if (selectedSpec === 'all' && !allowedNames.includes(name)) return;
 
             const data = stats[name];
-            if (data.paidSum === 0 && data.demoCount === 0 && data.freeCount === 0) return;
+            
+            // 1% ДЛЯ ДИРЕКТОРА
+            let headBonus = 0;
+            if (name === headName) {
+                headBonus = totalDepartmentPaidSum * 0.01;
+            }
+
+            // ВАЖНО: Пропускаем человека только если у него 0 личных задач И нет бонуса руководителя
+            if (data.paidSum === 0 && data.demoCount === 0 && data.freeCount === 0 && headBonus === 0) {
+                return;
+            }
 
             hasAnyData = true;
 
@@ -168,28 +221,27 @@ window.calculatePremium = async function() {
             else if (data.freeCount >= 50) freeRate = 60;
             const premiumFree = data.freeCount * freeRate;
 
-            const totalPremium = premiumPaid + premiumDemo + premiumFree;
+            const totalPremium = premiumPaid + premiumDemo + premiumFree + headBonus;
             totalSystemPremium += totalPremium;
 
             detailedTasksStore[name] = {
-                // Берем массив paidTasks
                 paid: (paidTasks || []).filter(t => t.specialist === name && t.category !== 'Демонстрация'),
                 demo: (paidTasks || []).filter(t => t.specialist === name && t.category === 'Демонстрация'),
-                // Для бесплатных задач сразу прокидываем внутрь точную дату выполнения
                 free: (validFreeTasks || []).filter(t => t.specialist === name).map(t => ({
                     ...t, 
                     completionDate: taskCompletionDates[t.id] || t.date 
                 })),
-                monthLabel: monthVal,
-                summary: { premiumPaid, premiumDemo, premiumFree, totalPremium, freeRate, data }
+                monthLabel: reportMonthText,
+                summary: { premiumPaid, premiumDemo, premiumFree, headBonus, totalDepartmentPaidSum, totalPremium, freeRate, data }
             };
 
             // --- КАРТОЧКА СОТРУДНИКА ---
             html += `
                 <div class="col-md-3 mb-3">
                     <div class="premium-card h-100 d-flex flex-column">
-                        <div class="premium-card-header text-primary">
-                            ${name}
+                        <div class="premium-card-header text-primary d-flex justify-content-between align-items-center">
+                            <span>${name}</span>
+                            ${name === headName ? '<span class="badge bg-warning text-dark" style="font-size: 0.6rem;">Руководитель</span>' : ''}
                         </div>
                         <div class="p-3 flex-grow-1">
                             <div class="premium-stat-row">
@@ -201,9 +253,14 @@ window.calculatePremium = async function() {
                                 <span><span class="text-secondary small me-1">${data.demoCount} шт.</span> <b>${premiumDemo} ₽</b></span>
                             </div>
                             <div class="premium-stat-row">
-                                <span class="text-muted">Беспл. (ставка ${freeRate}₽):</span>
+                                <span class="text-muted">Беспл. (${freeRate}₽/шт):</span>
                                 <span><span class="text-secondary small me-1">${data.freeCount} шт.</span> <b>${premiumFree} ₽</b></span>
                             </div>
+                            ${name === headName ? `
+                            <div class="premium-stat-row" style="background-color: #fff9e6; margin: 4px -20px -8px -20px; padding: 8px 20px;">
+                                <span class="text-muted">1% от отдела:</span>
+                                <span><span class="text-secondary small me-1">от ${totalDepartmentPaidSum}₽</span> <b class="text-warning-emphasis">+${Math.round(headBonus)} ₽</b></span>
+                            </div>` : ''}
                         </div>
                         <div class="p-3 bg-light border-top d-flex justify-content-between align-items-center">
                             <span class="text-uppercase text-muted" style="font-size: 0.8rem; font-weight: bold;">Итого премия:</span>
@@ -227,9 +284,17 @@ window.calculatePremium = async function() {
 
         if (selectedSpec === 'all') {
             html = `
-                <div class="alert alert-success d-flex justify-content-between align-items-center mb-4 border-success-subtle">
-                    <span class="fw-bold">Общий фонд премии за период:</span>
-                    <h4 class="mb-0 fw-bold text-success">${Math.round(totalSystemPremium).toLocaleString('ru-RU')} ₽</h4>
+                <div class="alert alert-success d-flex justify-content-between align-items-center mb-4 border-success-subtle shadow-sm">
+                    <div>
+                        <span class="fw-bold d-block text-success-emphasis">Общий фонд премии за период:</span>
+                        <small class="text-success opacity-75">Все технические специалисты</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <h3 class="mb-0 fw-bold text-success">${Math.round(totalSystemPremium).toLocaleString('ru-RU')} ₽</h3>
+                        <button class="btn btn-success btn-sm shadow-sm rounded-pill px-3 ms-2" onclick="copyAllPremiumsToClipboard()">
+                            📋 Скопировать общий отчет
+                        </button>
+                    </div>
                 </div>
             ` + html;
         }
@@ -238,28 +303,90 @@ window.calculatePremium = async function() {
 
     } catch (err) {
         console.error("Ошибка при подсчете:", err);
-        container.innerHTML = '<div class="text-danger text-center py-5">Произошла ошибка загрузки данных из БД. Откройте консоль (F12).</div>';
+        container.innerHTML = '<div class="text-danger text-center py-5">Произошла ошибка загрузки данных из БД.</div>';
     }
 };
 
-// Функция копирования текста для технаря
+// Индивидуальный отчет для одного спеца
 window.copyPremiumToClipboard = function(name) {
     const d = detailedTasksStore[name];
     if (!d) return;
 
-    const text = `
-Специалист: ${name}
-Период: ${d.monthLabel}
----------------------------
-Платные (10%): ${Math.round(d.summary.premiumPaid)} ₽ (из ${d.summary.data.paidSum} ₽)
-Демо (550 ₽/шт): ${Math.round(d.summary.premiumDemo)} ₽ (${d.summary.data.demoCount} шт.)
-Бесплатные (${d.summary.freeRate} ₽/шт): ${Math.round(d.summary.premiumFree)} ₽ (${d.summary.data.freeCount} шт.)
----------------------------
-ИТОГО ПРЕМИЯ: ${Math.round(d.summary.totalPremium).toLocaleString('ru-RU')} ₽
-    `.trim();
+    let text = `Премия за ${d.monthLabel} - ${name}\n`;
+    text += `──────────────────────────────\n`;
+    text += `% от выполненных услуг: ${d.summary.premiumPaid.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n`;
+    text += `  (${d.summary.data.paidSum.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽ × 10%)\n`;
+    
+    text += `Бесплатные задачи: ${d.summary.premiumFree.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n`;
+    text += `  (${d.summary.data.freeCount} задач × ${d.summary.freeRate} ₽)\n`;
+    
+    text += `Демонстрации: ${d.summary.premiumDemo.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n`;
+    text += `  (${d.summary.data.demoCount} × 550 ₽)\n`;
+
+    if (d.summary.headBonus > 0) {
+        const depSum = Math.round(d.summary.headBonus / 0.01);
+        text += `+1% от услуг отдела: ${d.summary.headBonus.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n`;
+        text += `  (${depSum.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽ × 1%)\n`;
+    }
+    
+    text += `──────────────────────────────\n`;
+    text += `Итого: ${d.summary.totalPremium.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽`;
 
     navigator.clipboard.writeText(text).then(() => {
-        showToast('📋 Отчет скопирован в буфер обмена!');
+        showToast(`📋 Отчет для ${name} скопирован!`);
+    });
+};
+
+// Общий отчет для руководителя
+window.copyAllPremiumsToClipboard = function() {
+    // Берем месяц из первой попавшейся записи
+    const sampleKey = Object.keys(detailedTasksStore)[0];
+    if (!sampleKey) return;
+    const monthLabel = detailedTasksStore[sampleKey].monthLabel;
+
+    let totalSum = 0;
+    
+    let text = `═══ ОТЧЁТ ПО ПРЕМИЯМ ═══\n`;
+    text += `Период: ${monthLabel}\n`;
+    text += `══════════════════════════════════════\n\n`;
+
+    const names = Object.keys(detailedTasksStore);
+    
+    names.forEach((name, index) => {
+        const d = detailedTasksStore[name];
+        totalSum += d.summary.totalPremium;
+
+        text += `Премия за ${monthLabel} - ${name}\n`;
+        text += `──────────────────────────────\n`;
+        text += `% от выполненных услуг: ${d.summary.premiumPaid.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n`;
+        text += `  (${d.summary.data.paidSum.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽ × 10%)\n`;
+        
+        text += `Бесплатные задачи: ${d.summary.premiumFree.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n`;
+        text += `  (${d.summary.data.freeCount} задач × ${d.summary.freeRate} ₽)\n`;
+        
+        text += `Демонстрации: ${d.summary.premiumDemo.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n`;
+        text += `  (${d.summary.data.demoCount} × 550 ₽)\n`;
+
+        if (d.summary.headBonus > 0) {
+            const depSum = Math.round(d.summary.headBonus / 0.01);
+            text += `+1% от услуг отдела: ${d.summary.headBonus.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n`;
+            text += `  (${depSum.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽ × 1%)\n`;
+        }
+        
+        text += `──────────────────────────────\n`;
+        text += `Итого: ${d.summary.totalPremium.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽\n\n`;
+
+        // Добавляем разделитель, если это не последний сотрудник
+        if (index < names.length - 1) {
+            text += `╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌\n\n`;
+        }
+    });
+
+    text += `══════════════════════════════════════\n`;
+    text += `ОБЩАЯ СУММА ПРЕМИЙ: ${totalSum.toLocaleString('ru-RU', {minimumFractionDigits: 2})} ₽`;
+
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 Общий отчет скопирован в буфер обмена!');
     });
 };
 

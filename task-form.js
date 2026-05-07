@@ -1,24 +1,56 @@
 let editMode = false;
 let editTaskId = null;
 
-// Функция-загрузчик данных из БД
-async function loadTaskCatalog() {
-    const { data: catalog, error: catError } = await supabase
-        .from('task_catalog')
-        .select('*')
-        .eq('is_active', true);
 
-    if (catError) return console.error("Ошибка каталога:", catError);
-    
-    const { data: skills, error: skillError } = await supabase
-        .from('specialist_skills')
-        .select('*');
-        
-    if (skillError) console.error("Ошибка навыков:", skillError);
-    
-    window.taskCatalog = catalog; 
-    window.specialistSkills = skills || [];
-    console.log("Каталог и навыки загружены");
+// Функция-загрузчик данных из БД (с кэшем)
+async function loadTaskCatalog() {
+    // 1. МГНОВЕННО: подставляем из кэша браузера
+    const cachedCat = localStorage.getItem('cache_task_catalog');
+    const cachedSkills = localStorage.getItem('cache_specialist_skills');
+
+    if (cachedCat && cachedSkills) {
+        try {
+            window.taskCatalog = JSON.parse(cachedCat);
+            window.specialistSkills = JSON.parse(cachedSkills);
+        } catch (e) {
+            window.taskCatalog = [];
+            window.specialistSkills = [];
+        }
+    }
+
+    // 2. ФОНОВО: грузим оба запроса параллельно и обновляем кэш
+    try {
+        const [catRes, skillRes] = await Promise.all([
+            supabase.from('task_catalog').select('*').eq('is_active', true),
+            supabase.from('specialist_skills').select('*')
+        ]);
+
+        if (catRes.error) {
+            console.error("Ошибка каталога:", catRes.error);
+            return;
+        }
+        if (skillRes.error) console.error("Ошибка навыков:", skillRes.error);
+
+        const freshCatalog = catRes.data || [];
+        const freshSkills = skillRes.data || [];
+
+        // Обновляем переменные и кэш только если данные реально изменились
+        const freshCatStr = JSON.stringify(freshCatalog);
+        const freshSkillsStr = JSON.stringify(freshSkills);
+
+        if (freshCatStr !== cachedCat) {
+            window.taskCatalog = freshCatalog;
+            localStorage.setItem('cache_task_catalog', freshCatStr);
+        }
+        if (freshSkillsStr !== cachedSkills) {
+            window.specialistSkills = freshSkills;
+            localStorage.setItem('cache_specialist_skills', freshSkillsStr);
+        }
+
+        console.log("Каталог и навыки обновлены");
+    } catch (e) {
+        console.error("Ошибка фоновой загрузки каталога:", e);
+    }
 }
 
 // 1. ДЕЛЕГИРОВАНИЕ ОТПРАВКИ ФОРМЫ (чтобы работало на динамической модалке)
@@ -54,27 +86,87 @@ document.addEventListener('submit', async (e) => {
         let tasksToSave = [];
 
         if (editMode) {
-            // Редактирование: оставляем как было (по одной задаче)
             const historyCommentValue = document.getElementById('historyComment')?.value || '';
             const { data: oldTask } = await supabase.from(targetTable).select('*').eq('id', editTaskId).single();
             
-            // (Здесь остается твоя логика сравнения старых и новых данных для истории...)
-            // ...
+            // 1. Вычисляем изменения для ЛЮБОЙ задачи (одиночной или в цепочке)
+            const originalTask = (window.editChainId && window.taskChain) ? (window.taskChain[window.activeChainIndex] || oldTask) : oldTask;
 
+            const origTime = (originalTask.time || '').substring(0, 5);
+            const newTime  = (taskData.time || '').substring(0, 5);
+
+            const normalizeDate = (d) => {
+                if (!d) return '';
+                const parsed = new Date(d);
+                if (!isNaN(parsed)) return parsed.toISOString().split('T')[0];
+                return d;
+            };
+            const origDate = normalizeDate(originalTask.date);
+            const newDate  = normalizeDate(taskData.date);
+
+            const timeChanged = newTime && origTime !== newTime;
+            const dateChanged = newDate && origDate !== newDate;
+
+            // 2. ИСПРАВЛЕНИЕ: Корректируем статус и защищаем создателя задачи
+            if (timeChanged || dateChanged) {
+                taskData.status = 'Перенесен';
+            } else {
+                taskData.status = oldTask.status; // Если время не трогали, оставляем текущий статус (например, "Ожидание от клиента")
+            }
+            delete taskData.manager; // Удаляем из отправки, чтобы не "украсть" авторство задачи
+            delete taskData.dept;
+
+            // 3. Если это цепочка и изменилось время — используем спец. логику
+            if (window.editChainId) {
+                const taskType = document.getElementById('hiddenTaskType')?.value;
+                const isFreeTask = taskType === 'free';
+                const originalTask = (window.editChainId && window.taskChain) ? (window.taskChain[window.activeChainIndex] || oldTask) : oldTask;
+
+                // Для бесплатных задач — времени нет, проверяем только дату
+                const normalizeDate = (d) => {
+                    if (!d) return '';
+                    const parsed = new Date(d);
+                    if (!isNaN(parsed)) return parsed.toISOString().split('T')[0];
+                    return d;
+                };
+
+                const origDate = normalizeDate(originalTask.date);
+                const newDate  = normalizeDate(taskData.date);
+                const dateChanged = newDate && origDate !== newDate;
+
+                let timeChanged = false;
+                if (!isFreeTask) {
+                    const origTime = (originalTask.time || '').substring(0, 5);
+                    const newTime  = (taskData.time || '').substring(0, 5);
+                    timeChanged = newTime && origTime !== newTime;
+                }
+
+                if (timeChanged || dateChanged) {
+                    window.showChainRescheduleChoice(taskData);
+                    btn.disabled = false;
+                    return;
+                }
+            }
+
+            // 4. Обычное сохранение (для одиночных задач или цепочек без изменения времени)
             const { error } = await supabase.from(targetTable).update(taskData).eq('id', editTaskId);
             if (!error) {
                 bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
             } else {
                 alert("Ошибка обновления");
             }
-        } else {
+        }else {
             // СОЗДАНИЕ (одиночное или цепочка)
             // 1. Принудительно сохраняем то, что прямо сейчас введено в форму
             if (typeof window.taskChain !== 'undefined' && window.taskChain.length > 0) {
                 window.taskChain[window.activeChainIndex || 0] = taskData;
                 
                 // ПРОВЕРКА ЦЕПОЧКИ: Все ли свернутые задачи дозаполнены?
-                const invalidIndex = window.taskChain.findIndex(t => !t.task_name || !t.specialist || !t.inn || !t.date || !t.time);
+                const taskType = document.getElementById('hiddenTaskType')?.value;
+                const isFreeChain = taskType === 'free';
+                const invalidIndex = window.taskChain.findIndex(t =>
+                    !t.task_name || !t.specialist || !t.inn || !t.date || (!isFreeChain && !t.time)
+                );
                 if (invalidIndex !== -1 && window.taskChain.length > 1) {
                     alert(`Невозможно сохранить: задача #${invalidIndex + 1} заполнена не полностью!\nРазверните её и заполните обязательные поля.`);
                     btn.disabled = false;
@@ -86,17 +178,26 @@ document.addEventListener('submit', async (e) => {
             const chainId = (window.taskChain && window.taskChain.length > 1) ? crypto.randomUUID() : null;
             
             // 3. Собираем всё из памяти в финальный массив
+            // Для бесплатных задач — только поля которые есть в free_tasks
+            const freeFields = ['category', 'task_name', 'specialist', 'inn', 'bitrix_url', 'date', 'comment', 'chain_id', 'manager', 'dept', 'status'];
+            const filterForTable = (raw) => {
+                const { billing_type, ...safeTask } = raw;
+                if (taskBillingType !== 'free') return safeTask;
+                const filtered = {};
+                freeFields.forEach(k => { if (safeTask[k] !== undefined) filtered[k] = safeTask[k]; });
+                return filtered;
+            };
+
             if (typeof window.taskChain !== 'undefined' && window.taskChain.length > 0) {
                 window.taskChain.forEach(t => {
-                    const { billing_type, ...safeTask } = t; 
-                    // Защита: сохраняем только задачи с названием
+                    const safeTask = filterForTable(t);
                     if (safeTask.task_name) {
                         tasksToSave.push({ ...safeTask, chain_id: chainId, manager: currentUser.name, dept: currentUser.dept, status: 'Новая' });
                     }
                 });
             } else {
-                // Страховка для одиночной задачи
-                tasksToSave.push({ ...taskData, chain_id: chainId, manager: currentUser.name, dept: currentUser.dept, status: 'Новая' });
+                const safeTask = filterForTable(taskData);
+                tasksToSave.push({ ...safeTask, chain_id: chainId, manager: currentUser.name, dept: currentUser.dept, status: 'Новая' });
             }
 
             const { data: savedTasks, error } = await supabase.from(targetTable).insert(tasksToSave).select();

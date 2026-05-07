@@ -78,12 +78,12 @@ window.renderTaskRowHTML = function(t) {
                 ${t.chain_id ? '<div class="chain-indicator"></div>' : ''}
                 <b class="text-primary">#${t.id}</b>
             </td>
-            <td><small class="text-muted">${t.dept || '-'}</small></td>
-            <td><small class="text-muted">${t.manager || '-'}</small></td>
-            <td><span class="badge border text-dark bg-light" style="font-size: 0.75rem;">${t.category || '-'}</span></td> 
+            <td class="cell-dept"><small class="text-muted">${t.dept || '-'}</small></td>
+            <td class="cell-manager"><small class="text-muted">${t.manager || '-'}</small></td>
+            <td class="cell-product"><span class="badge border text-dark bg-light" style="font-size: 0.75rem;">${t.category || '-'}</span></td>
             <td class="cell-task-name">${t.task_name}</td>
-            <td><small class="text-muted">${t.inn || '-'}</small></td>
-            <td>
+            <td class="cell-inn"><small class="text-muted">${t.inn || '-'}</small></td>
+            <td class="cell-bitrix">
                 ${t.bitrix_url && t.bitrix_url !== '-' ? `
                     <div class="d-flex align-items-center gap-2">
                         <a href="${t.bitrix_url}" target="_blank" class="text-decoration-none" onclick="window.handleBitrixClick(${t.id}, '${t.status}')">Открыть</a>
@@ -96,10 +96,10 @@ window.renderTaskRowHTML = function(t) {
                 ` : '-'}
             </td>
             <td class="cell-datetime" id="cell-datetime-${t.id}" style="${isGrayStatus ? 'color: #adb5bd; opacity: 0.6;' : ''}">${displayDate} | <strong>${displayTime}</strong></td>
-            ${isPaid ? `<td class="cell-comment" style="max-width: 180px;"><small class="text-dark">${t.comment || ''}</small></td>` : ''}
+            <td class="cell-comment" style="max-width: 180px;"><small class="text-dark">${t.comment || ''}</small></td>
             <td class="cell-price">${t.price ? t.price + ' ₽' : '—'}</td>
             <td class="cell-status">${statusHTML}</td>
-            <td>
+            <td class="cell-action">
                 <div class="d-flex gap-0 justify-content-center">
                     ${canEdit ? `
                         <button class="btn-action btn-edit" onclick="window.openEditTask(${t.id})" title="Редактировать">
@@ -178,7 +178,7 @@ async function loadTasks() {
     const deptTh = document.getElementById('th-dept');
     if (deptTh) deptTh.hidden = false;
     const commentTh = document.getElementById('th-comment');
-    if (commentTh) commentTh.hidden = !isPaid;
+    if (commentTh) commentTh.hidden = false;
 
     list.innerHTML = `<tr><td colspan="${totalCols}" class="text-center text-muted py-4">Загрузка...</td></tr>`;
 
@@ -200,11 +200,21 @@ async function loadTasks() {
             query = query.eq('specialist', activeTech);
         }
 
+        // Вычисляем "завтра" и достаем кастомную дату из кэша
+        const tomorrow = new Date(now);
+        tomorrow.setDate(now.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const customDateVal = localStorage.getItem('customDateVal');
+
         if (isPaid && dateFilter === 'all') {
             // Загружаем 5 дней сразу (от позавчера до послезавтра)
             query = query.gte('date', pastDateStr).lte('date', futureDateStr);
         } else if (dateFilter === 'today') {
             query = query.eq('date', todayStr);
+        } else if (dateFilter === 'tomorrow') {
+            query = query.eq('date', tomorrowStr);
+        } else if (dateFilter === 'custom' && customDateVal) {
+            query = query.eq('date', customDateVal);
         }
 
         query = query.order('date', { ascending: true });
@@ -235,7 +245,10 @@ function renderTaskList(tasks, isFirstStep = false) {
     const totalCols = currentTable === 'tasks' ? 12 : 11;
 
     const hasToday = tasks.some(t => (t.date || (t.created_at ? t.created_at.split('T')[0] : '')) === todayStr);
-    if (isFirstStep && !hasToday && currentTable !== 'free_tasks') {
+    const currentDateFilter = localStorage.getItem('dateFilter') || 'all';
+
+    // Показываем пустое "Сегодня", ТОЛЬКО если активен фильтр "Все" или "Сегодня"
+    if (isFirstStep && !hasToday && currentTable !== 'free_tasks' && (currentDateFilter === 'all' || currentDateFilter === 'today')) {
         tasks.push({ date: todayStr, isEmptyPlaceholder: true });
     }
 
@@ -577,10 +590,20 @@ function updateTaskRowUI(t) {
 
     const activeTech = activeTechFilter;
     const dateFilter = localStorage.getItem('dateFilter') || 'all';
-    const now = new Date().toISOString().split('T')[0];
     
-    if ((activeTech !== 'all' && t.specialist !== activeTech) || 
-        (dateFilter === 'today' && t.date !== now)) {
+    const nowObj = new Date();
+    const nowStr = nowObj.toISOString().split('T')[0];
+    const tomorrowObj = new Date(nowObj);
+    tomorrowObj.setDate(nowObj.getDate() + 1);
+    const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
+    const customDateVal = localStorage.getItem('customDateVal');
+
+    let shouldHide = false;
+    if (dateFilter === 'today' && t.date !== nowStr) shouldHide = true;
+    if (dateFilter === 'tomorrow' && t.date !== tomorrowStr) shouldHide = true;
+    if (dateFilter === 'custom' && customDateVal && t.date !== customDateVal) shouldHide = true;
+    
+    if ((activeTech !== 'all' && t.specialist !== activeTech) || shouldHide) {
         row.remove();
         document.querySelectorAll(`.phantom-${t.id}`).forEach(el => el.remove());
         return;
@@ -600,14 +623,17 @@ function updateTaskRowUI(t) {
         return;
     }
 
-    // --- ИСПРАВЛЕНИЕ №2: Обновляем содержимое через renderTaskRowHTML ---
-    // Это обновит статус, цену и комментарий одновременно и правильно
     const tempTable = document.createElement('table');
     tempTable.innerHTML = window.renderTaskRowHTML(t);
     const newRowHTML = tempTable.querySelector('tr').innerHTML;
     
     row.innerHTML = newRowHTML;
     row.setAttribute('data-duration', newDuration);
+
+    // Перерисовываем визуалы цепочки — иначе теряется полоска слева
+    if (typeof window.updateChainVisuals === 'function') {
+        window.updateChainVisuals();
+    }
 }
 
 function insertTaskIntoDOM(t) {
@@ -616,10 +642,19 @@ function insertTaskIntoDOM(t) {
     // 1. Фильтры
     const activeTech = activeTechFilter; 
     const dateFilter = localStorage.getItem('dateFilter') || 'all';
-    const nowStr = new Date().toISOString().split('T')[0];
+    
+    const nowObj = new Date();
+    const nowStr = nowObj.toISOString().split('T')[0];
+    const tomorrowObj = new Date(nowObj);
+    tomorrowObj.setDate(nowObj.getDate() + 1);
+    const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
+    const customDateVal = localStorage.getItem('customDateVal');
     
     if (activeTech !== 'all' && t.specialist !== activeTech) return;
+    
     if (dateFilter === 'today' && t.date !== nowStr) return;
+    if (dateFilter === 'tomorrow' && t.date !== tomorrowStr) return;
+    if (dateFilter === 'custom' && customDateVal && t.date !== customDateVal) return;
 
     const list = document.getElementById('task-list'); 
     if (!list) return;
@@ -758,3 +793,66 @@ window.updateChainVisuals = function() {
         });
     });
 };
+
+// Утилита: получаем все строки, связанные с одной задачей (основная + её фантомы + цепочка)
+function getRelatedRows(row) {
+    if (!row) return [];
+
+    const chainId = row.getAttribute('data-chain');
+
+    // Если задача в цепочке — берём все строки этой цепочки (включая их фантомы)
+    if (chainId && chainId !== 'null' && chainId !== '') {
+        const chainRows = Array.from(document.querySelectorAll(`tr[data-chain="${chainId}"]`));
+        const allRelated = new Set(chainRows);
+
+        // Для каждой основной задачи цепочки — добавим её фантомы
+        chainRows.forEach(r => {
+            const idMatch = r.id?.match(/^task-row-(\d+)$/);
+            if (idMatch) {
+                document.querySelectorAll(`tr.phantom-${idMatch[1]}`).forEach(p => allRelated.add(p));
+            }
+        });
+
+        return Array.from(allRelated);
+    }
+
+    // Задача не в цепочке — определяем id задачи (по основной строке или по фантому)
+    let taskId = null;
+    const mainMatch = row.id?.match(/^task-row-(\d+)$/);
+    if (mainMatch) {
+        taskId = mainMatch[1];
+    } else {
+        const phantomMatch = Array.from(row.classList).find(c => c.startsWith('phantom-'));
+        if (phantomMatch) taskId = phantomMatch.replace('phantom-', '');
+    }
+
+    if (!taskId) return [row];
+
+    const result = [];
+    const main = document.getElementById(`task-row-${taskId}`);
+    if (main) result.push(main);
+    document.querySelectorAll(`tr.phantom-${taskId}`).forEach(p => result.push(p));
+    return result;
+}
+
+// Подсветка всех связанных строк при наведении (цепочка + фантомы, или одна задача + её фантомы)
+document.addEventListener('mouseover', (e) => {
+    const row = e.target.closest('tr.task-row, tr[class*="phantom-"]');
+    if (!row) return;
+
+    getRelatedRows(row).forEach(r => r.classList.add('chain-hover'));
+});
+
+document.addEventListener('mouseout', (e) => {
+    const row = e.target.closest('tr.task-row, tr[class*="phantom-"]');
+    if (!row) return;
+
+    // Не снимаем подсветку, если курсор перешёл на связанную строку
+    const related = e.relatedTarget?.closest('tr.task-row, tr[class*="phantom-"]');
+    if (related) {
+        const currentSet = new Set(getRelatedRows(row));
+        if (currentSet.has(related)) return;
+    }
+
+    getRelatedRows(row).forEach(r => r.classList.remove('chain-hover'));
+});
